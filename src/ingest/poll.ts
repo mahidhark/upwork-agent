@@ -9,16 +9,20 @@
  *   npm run poll -- --once
  */
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 
 import { loadConfig, type AgentConfig, type SearchProfile } from '../search-profiles.js';
 import { FileAuthProvider } from '../auth/provider.js';
 import { connect } from '../mcp/client.js';
 import { searchJobs, getJob, connectsBalance, firstOrgUid, type SearchHit } from '../mcp/upwork.js';
 import { screen, passed, failures } from '../screen/gates.js';
+import { scoreJob } from '../score/score.js';
+import { raise, authRevoked, connectsLow } from '../alert/index.js';
 import {
   recordSeen,
   recordGate,
   setState,
+  setScore,
   isEmpty,
   startRun,
   finishRun,
@@ -30,10 +34,20 @@ export interface PollSummary {
   screened: number;
   accepted: number;
   rejected: number;
+  topScore: number;
   bootstrapped: boolean;
 }
 
 const ageMinutes = (iso: string, now: Date) => (now.getTime() - new Date(iso).getTime()) / 60000;
+
+/** An expired or revoked authorization, as distinct from a transient failure. */
+export function isAuthError(err: unknown): boolean {
+  if (err instanceof UnauthorizedError) return true;
+  const message = err instanceof Error ? err.message : String(err);
+  return /\b401\b|unauthorized|invalid_token|invalid_grant|token (has )?expired/i.test(message);
+}
+
+let lastBalance = { value: 0, at: 0 };
 
 /** Page only while every hit on the page is new — otherwise we have caught up (finding 1.a). */
 async function collect(
@@ -76,6 +90,30 @@ async function collect(
   return { hits, newIds };
 }
 
+/**
+ * Connects balance, refreshed at most every `balanceCheckMinutes` unless a
+ * candidate needs an up-to-date figure. Also the trigger for the low-balance
+ * alert — checked on a schedule rather than only when something qualifies, so
+ * a quiet week still warns before the balance runs out.
+ */
+async function currentBalance(
+  client: Client,
+  orgUid: string,
+  config: AgentConfig,
+  now: Date,
+): Promise<number> {
+  const staleAfter = config.alerts.balanceCheckMinutes * 60000;
+  if (lastBalance.at && now.getTime() - lastBalance.at < staleAfter) return lastBalance.value;
+
+  const balance = (await connectsBalance(client, orgUid)).connectsBalance;
+  lastBalance = { value: balance, at: now.getTime() };
+
+  if (balance < config.alerts.connectsFloor) {
+    await raise(connectsLow(balance, config.alerts.connectsFloor, 15));
+  }
+  return balance;
+}
+
 export async function pollOnce(
   client: Client,
   orgUid: string,
@@ -92,6 +130,7 @@ export async function pollOnce(
     screened: 0,
     accepted: 0,
     rejected: 0,
+    topScore: 0,
     bootstrapped: bootstrapping,
   };
 
@@ -124,7 +163,7 @@ export async function pollOnce(
   }
   if (fresh.length === 0) return summary;
 
-  const balance = (await connectsBalance(client, orgUid)).connectsBalance;
+  const balance = await currentBalance(client, orgUid, config, now);
 
   for (const hit of fresh) {
     try {
@@ -138,8 +177,18 @@ export async function pollOnce(
       summary.screened++;
 
       if (passed(outcomes)) {
+        // FR-7: gates decide whether to bid, scoring decides what to bid on
+        // first — more postings qualify than the Connects budget can cover.
+        const breakdown = scoreJob(detail, now, config.score);
+        setScore(hit.id, breakdown.total);
         setState(hit.id, 'scored');
         summary.accepted++;
+        summary.topScore = Math.max(summary.topScore, breakdown.total);
+        console.log(
+          `    ${breakdown.total.toFixed(1).padStart(5)}  ${hit.title.slice(0, 58)}` +
+            `  [${hit.proposal_count ?? '?'} props` +
+            `${breakdown.matchedSkills.length ? `, ${breakdown.matchedSkills.slice(0, 4).join('/')}` : ''}]`,
+        );
       } else {
         setState(hit.id, 'rejected', failures(outcomes).map((f) => `${f.gate}: ${f.detail}`).join('; '));
         summary.rejected++;
@@ -162,7 +211,13 @@ export async function run(once: boolean): Promise<void> {
     throw new Error('not authorized — run `npm run auth` and connect first');
   }
 
-  const client = await connect(provider);
+  let client;
+  try {
+    client = await connect(provider);
+  } catch (err) {
+    if (isAuthError(err)) await raise(authRevoked(err instanceof Error ? err.message : String(err)));
+    throw err;
+  }
   const orgUid = await firstOrgUid(client);
   const base = config.pollIntervalSeconds * 1000;
   let backoff = base;
@@ -176,11 +231,16 @@ export async function run(once: boolean): Promise<void> {
       backoff = base;
       const line = s.bootstrapped
         ? `bootstrap — ${s.seen} existing postings marked seen, none processed`
-        : `${s.seen} seen · ${s.fresh} fresh · ${s.screened} screened · ${s.accepted} accepted · ${s.rejected} rejected`;
+        : `${s.seen} seen · ${s.fresh} fresh · ${s.screened} screened · ${s.accepted} accepted · ${s.rejected} rejected` +
+          (s.accepted ? ` · top ${s.topScore.toFixed(1)}` : '');
       console.log(`  ${new Date().toISOString()}  ${line}`);
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // A revoked authorization is not transient — backing off silently would
+      // leave the agent blind for hours without anyone knowing.
+      if (isAuthError(err)) await raise(authRevoked(message));
       // NFR-3: no documented rate limit, so back off rather than retry blind.
-      console.error(`  ${new Date().toISOString()}  poll failed: ${err instanceof Error ? err.message : String(err)}`);
+      console.error(`  ${new Date().toISOString()}  poll failed: ${message}`);
       backoff = Math.min(backoff * 2, 30 * 60 * 1000);
       console.error(`  backing off to ${Math.round(backoff / 1000)}s`);
     }

@@ -9,19 +9,24 @@
     "node": ">=22"
   },
   "scripts": {
-    "auth": "tsx src/auth/server.ts",
+    "auth": "tsx --env-file-if-exists=.env src/auth/server.ts",
+    "poll": "tsx --env-file-if-exists=.env src/ingest/poll.ts",
     "test": "node --import tsx --test src/**/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "spike": "tsx spike/mcp-auth.ts",
-    "poll": "tsx src/ingest/poll.ts"
+    "status": "tsx --env-file-if-exists=.env src/status.ts",
+    "alert:test": "tsx --env-file-if-exists=.env src/alert/test-alert.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.122.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "better-sqlite3": "^13.0.3"
+    "better-sqlite3": "^13.0.3",
+    "nodemailer": "^9.1.0",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.4.0",
+    "@types/nodemailer": "^8.0.1",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   }
