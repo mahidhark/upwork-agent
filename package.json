@@ -15,8 +15,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.122.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "better-sqlite3": "^13.0.3"
+    "better-sqlite3": "^13.0.3",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",

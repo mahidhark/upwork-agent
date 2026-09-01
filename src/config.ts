@@ -10,6 +10,21 @@ export const STORE_DIR = process.env.UPWORK_AGENT_STORE ?? join(homedir(), '.upw
 /** SQLite state. Outside the repo by default; `data/` is gitignored anyway. */
 export const DB_PATH = process.env.UPWORK_AGENT_DB ?? join(STORE_DIR, 'agent.db');
 
+/**
+ * Evidence corpus. Personal data, so it lives outside the repo — the repo ships
+ * the loader and the schema, and each operator writes their own.
+ */
+export const CORPUS_DIR =
+  process.env.UPWORK_AGENT_CORPUS ?? join(homedir(), 'upwork-profile', 'corpus');
+
+/**
+ * Model for both drafting passes. The guidance is to default to the most
+ * capable model and never downgrade for cost without the operator asking —
+ * and with nobody reviewing the letter before it goes out, quality matters
+ * more here than it would behind an approval step.
+ */
+export const DRAFT_MODEL = process.env.UPWORK_AGENT_MODEL ?? 'claude-opus-5';
+
 /** Port the auth UI listens on. */
 export const AUTH_PORT = Number(process.env.UPWORK_AGENT_PORT ?? 3400);
 
