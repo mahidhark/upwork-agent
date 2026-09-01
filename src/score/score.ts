@@ -34,8 +34,10 @@ export interface ScoreConfig {
   feedbackTarget: number;
   /** Client lifetime spend, in dollars, for full marks. */
   spendTarget: number;
-  /** Budget band that suits the current strategy. */
+  /** Budget band that suits the current strategy, for fixed-price work. */
   budgetSweetSpot: { min: number; max: number };
+  /** Equivalent band for hourly work, in dollars per hour. */
+  hourlySweetSpot: { min: number; max: number };
   /** Tools and topics the operator can evidence. Matching earns specificity. */
   skills: string[];
 }
@@ -54,6 +56,7 @@ export const DEFAULT_SCORE_CONFIG: ScoreConfig = {
   feedbackTarget: 10,
   spendTarget: 10000,
   budgetSweetSpot: { min: 100, max: 600 },
+  hourlySweetSpot: { min: 20, max: 60 },
   skills: [],
 };
 
@@ -113,7 +116,13 @@ export function scoreJob(
     clientSpend: clamp01(
       Math.log10(num(job.clientRecord.spend_total) + 1) / Math.log10(config.spendTarget),
     ),
-    budgetFit: budgetFit(job.budget, config.budgetSweetSpot),
+    // Hourly postings carry no project budget, so judge them on the bottom of
+    // the stated rate range against an hourly band. Without this every hourly
+    // job scored zero here and lost a tenth of its total for being hourly.
+    budgetFit:
+      job.jobType === 'hourly'
+        ? budgetFit(job.hourlyMin ?? job.hourlyMax, config.hourlySweetSpot)
+        : budgetFit(job.budget, config.budgetSweetSpot),
   };
 
   let total = 0;

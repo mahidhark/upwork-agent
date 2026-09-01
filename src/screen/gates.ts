@@ -20,6 +20,7 @@ export interface ClientRecord {
 export interface PreferredQualifications {
   min_job_success_score?: number;
   min_earnings?: string;
+  /** Hours logged on Upwork. Fixed-price work accrues none, so this is a real floor. */
   min_hours_worked?: number;
   rising_talent?: boolean;
 }
@@ -36,6 +37,9 @@ export interface JobDetail {
   /** Hourly postings carry no project budget — search reports 0.0 for them. */
   jobType: 'fixed' | 'hourly' | null;
   budget: number | null;
+  /** Client's stated hourly range, from hourlyContractTerms. */
+  hourlyMin: number | null;
+  hourlyMax: number | null;
   createdDate: string;
   proposalCount: number | null;
   canApply: boolean;
@@ -64,6 +68,10 @@ export interface ScreenConfig {
   minClientFeedbackCount: number;
   /** Scope heuristic: reject when implied deliverables per $100 exceed this. */
   maxDeliverablesPer100: number;
+  /** Lowest hourly rate worth bidding, in dollars. */
+  minHourlyRate: number;
+  /** Hours logged on Upwork. Zero while the account is fixed-price only. */
+  hoursWorked: number;
 }
 
 export const DEFAULT_SCREEN_CONFIG: ScreenConfig = {
@@ -73,6 +81,8 @@ export const DEFAULT_SCREEN_CONFIG: ScreenConfig = {
   minClientSpend: 1,
   minClientFeedbackCount: 1,
   maxDeliverablesPer100: 1.5,
+  minHourlyRate: 15,
+  hoursWorked: 0,
 };
 
 const num = (v: string | number | undefined): number =>
@@ -142,14 +152,26 @@ export function screen(
   );
 
   // --- eligibility: the operator has no JSS, so any floor is unwinnable.
-  const jss = job.preferredQualifications.min_job_success_score ?? 0;
-  const earnings = job.preferredQualifications.min_earnings ?? 'Any';
+  const pq = job.preferredQualifications;
+  const jss = pq.min_job_success_score ?? 0;
+  const earnings = pq.min_earnings ?? 'Any';
+  const hoursRequired = pq.min_hours_worked ?? 0;
+  const risingTalent = pq.rising_talent ?? false;
+
+  // Every one of these is a floor the account cannot clear yet. min_hours_worked
+  // is the easiest to miss: fixed-price contracts log no hours at all, so an
+  // account can be busy and still read as zero.
+  const unmet = [
+    jss !== 0 && `JSS ${jss}`,
+    earnings !== 'Any' && `earnings ${earnings}`,
+    hoursRequired > config.hoursWorked && `${hoursRequired}h worked`,
+    risingTalent && 'Rising Talent badge',
+  ].filter((x): x is string => Boolean(x));
+
   add(
     'eligible',
-    jss === 0 && earnings === 'Any',
-    jss !== 0 || earnings !== 'Any'
-      ? `client requires JSS ${jss} / earnings ${earnings}`
-      : 'no JSS or earnings floor',
+    unmet.length === 0,
+    unmet.length ? `client requires ${unmet.join(', ')}` : 'no qualification floors',
   );
 
   // --- the server's own verdict.
@@ -204,6 +226,22 @@ export function screen(
   // not be read as "a fixed job with a suspiciously missing budget".
   if (job.jobType === 'hourly') {
     add('scope_fits_budget', true, 'hourly — billed as worked, gate does not apply');
+
+    // The scope gate does not apply to hourly work, but a rate floor does:
+    // without one the agent would happily bid on $3/hr postings.
+    //
+    // Judge on the BOTTOM of the client's range, not the top. "$10-15/hr
+    // depending on experience" pays an unrated freelancer $10 — taking the
+    // ceiling as the expected rate is how you end up working at the floor
+    // while believing you negotiated the cap.
+    const offered = job.hourlyMin ?? job.hourlyMax;
+    add(
+      'rate_acceptable',
+      offered !== null && offered >= config.minHourlyRate,
+      offered === null
+        ? 'no rate stated on an hourly posting'
+        : `client range starts at $${offered}/hr, floor $${config.minHourlyRate}`,
+    );
   } else {
     const budget = job.budget ?? 0;
     const deliverables = countDeliverables(job.description);

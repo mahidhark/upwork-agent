@@ -15,6 +15,8 @@ const job = (over: Partial<JobDetail> = {}): JobDetail => ({
   title: 'Automation work',
   description: 'Connect two systems.',
   jobType: 'fixed',
+  hourlyMin: null,
+  hourlyMax: null,
   budget: 300,
   createdDate: '2026-09-01T11:50:00Z',
   proposalCount: 5,
@@ -135,4 +137,17 @@ test('the real August pools score near the floor', () => {
   assert.equal(august.components.pool, 0);
   assert.equal(august.components.freshness, 0);
   assert.ok(august.total < 25, `expected < 25, got ${august.total}`);
+});
+
+test('hourly postings are scored on their rate, not penalised for having no budget', () => {
+  const good = scoreJob(job({ jobType: 'hourly', budget: null, hourlyMin: 35, hourlyMax: 60 }), NOW, config);
+  const poor = scoreJob(job({ jobType: 'hourly', budget: null, hourlyMin: 8, hourlyMax: 12 }), NOW, config);
+  assert.equal(good.components.budgetFit, 1, 'a $35/hr posting should sit inside the band');
+  assert.ok(poor.components.budgetFit < 0.7, `expected a taper, got ${poor.components.budgetFit}`);
+  assert.ok(good.total > poor.total);
+});
+
+test('an hourly posting is not scored on the top of its range', () => {
+  const s = scoreJob(job({ jobType: 'hourly', budget: null, hourlyMin: 10, hourlyMax: 100 }), NOW, config);
+  assert.ok(s.components.budgetFit < 1, 'the $10 floor should decide, not the $100 ceiling');
 });
