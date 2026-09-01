@@ -158,8 +158,14 @@ export async function pollOnce(
     (hit) => ageMinutes(hit.created_date, now) <= config.screen.maxAgeMinutes,
   );
   summary.fresh = fresh.length;
+  // Record HOW stale, not just that it was. Zero detections has two very
+  // different explanations that look identical from outside: a quiet market,
+  // or Upwork's search index lagging behind actual posting time. If rejected
+  // postings cluster just past the window, it is lag and the window is wrong.
   for (const stale of candidates) {
-    if (!fresh.includes(stale)) setState(stale.id, 'rejected', 'stale on arrival');
+    if (fresh.includes(stale)) continue;
+    const age = ageMinutes(stale.created_date, now);
+    setState(stale.id, 'rejected', `stale on arrival: ${age.toFixed(1)} min old`);
   }
   if (fresh.length === 0) return summary;
 
