@@ -1,0 +1,47 @@
+# --- Personal / business data. NEVER commit. ---
+# Proposal drafts, rates, client notes and profile material live outside this
+# repo (~/upwork-profile). These patterns are a second line of defence in case
+# anything is ever copied in.
+proposals/
+proposal-*.txt
+proposal-*.md
+profile.md
+rates*
+clients*
+*.private.*
+private/
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+tokens.json
+.credentials/
+
+# Runtime output
+out/
+data/
+*.sqlite
+*.db
+*.log
+
+# Node
+node_modules/
+dist/
+build/
+.npm/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
