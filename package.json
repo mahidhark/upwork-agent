@@ -9,11 +9,10 @@
     "node": ">=22"
   },
   "scripts": {
-    "auth": "tsx src/auth/server.ts",
+    "auth": "tsx --env-file-if-exists=.env src/auth/server.ts",
+    "poll": "tsx --env-file-if-exists=.env src/ingest/poll.ts",
     "test": "node --import tsx --test src/**/*.test.ts",
-    "typecheck": "tsc --noEmit",
-    "spike": "tsx spike/mcp-auth.ts",
-    "poll": "tsx src/ingest/poll.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

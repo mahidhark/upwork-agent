@@ -15,10 +15,12 @@ import { FileAuthProvider } from '../auth/provider.js';
 import { connect } from '../mcp/client.js';
 import { searchJobs, getJob, connectsBalance, firstOrgUid, type SearchHit } from '../mcp/upwork.js';
 import { screen, passed, failures } from '../screen/gates.js';
+import { scoreJob } from '../score/score.js';
 import {
   recordSeen,
   recordGate,
   setState,
+  setScore,
   isEmpty,
   startRun,
   finishRun,
@@ -30,6 +32,7 @@ export interface PollSummary {
   screened: number;
   accepted: number;
   rejected: number;
+  topScore: number;
   bootstrapped: boolean;
 }
 
@@ -92,6 +95,7 @@ export async function pollOnce(
     screened: 0,
     accepted: 0,
     rejected: 0,
+    topScore: 0,
     bootstrapped: bootstrapping,
   };
 
@@ -138,8 +142,18 @@ export async function pollOnce(
       summary.screened++;
 
       if (passed(outcomes)) {
+        // FR-7: gates decide whether to bid, scoring decides what to bid on
+        // first — more postings qualify than the Connects budget can cover.
+        const breakdown = scoreJob(detail, now, config.score);
+        setScore(hit.id, breakdown.total);
         setState(hit.id, 'scored');
         summary.accepted++;
+        summary.topScore = Math.max(summary.topScore, breakdown.total);
+        console.log(
+          `    ${breakdown.total.toFixed(1).padStart(5)}  ${hit.title.slice(0, 58)}` +
+            `  [${hit.proposal_count ?? '?'} props` +
+            `${breakdown.matchedSkills.length ? `, ${breakdown.matchedSkills.slice(0, 4).join('/')}` : ''}]`,
+        );
       } else {
         setState(hit.id, 'rejected', failures(outcomes).map((f) => `${f.gate}: ${f.detail}`).join('; '));
         summary.rejected++;
@@ -176,7 +190,8 @@ export async function run(once: boolean): Promise<void> {
       backoff = base;
       const line = s.bootstrapped
         ? `bootstrap — ${s.seen} existing postings marked seen, none processed`
-        : `${s.seen} seen · ${s.fresh} fresh · ${s.screened} screened · ${s.accepted} accepted · ${s.rejected} rejected`;
+        : `${s.seen} seen · ${s.fresh} fresh · ${s.screened} screened · ${s.accepted} accepted · ${s.rejected} rejected` +
+          (s.accepted ? ` · top ${s.topScore.toFixed(1)}` : '');
       console.log(`  ${new Date().toISOString()}  ${line}`);
     } catch (err) {
       // NFR-3: no documented rate limit, so back off rather than retry blind.
