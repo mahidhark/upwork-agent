@@ -171,6 +171,9 @@ export async function pollOnce(
       // get carries neither the posting date nor the pool size; search does.
       detail.createdDate = hit.created_date;
       detail.proposalCount = hit.proposal_count ?? null;
+      if (!detail.jobType && hit.job_type) {
+        detail.jobType = hit.job_type === 'hourly' ? 'hourly' : 'fixed';
+      }
 
       const outcomes = screen(detail, balance, now, config.screen);
       for (const o of outcomes) recordGate(hit.id, o.gate, o.passed, o.detail);

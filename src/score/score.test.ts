@@ -14,6 +14,7 @@ const job = (over: Partial<JobDetail> = {}): JobDetail => ({
   id: 'x',
   title: 'Automation work',
   description: 'Connect two systems.',
+  jobType: 'fixed',
   budget: 300,
   createdDate: '2026-09-01T11:50:00Z',
   proposalCount: 5,
