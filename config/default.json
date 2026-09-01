@@ -2,7 +2,7 @@
   "pollIntervalSeconds": 180,
   "maxPagesPerProfile": 2,
   "screen": {
-    "maxAgeMinutes": 45,
+    "maxAgeMinutes": 10,
     "maxProposals": 20,
     "connectsReserve": 30,
     "minClientSpend": 1,
@@ -65,7 +65,7 @@
       "budgetFit": 0.1
     },
     "poolFloor": 20,
-    "freshnessFloorMinutes": 45,
+    "freshnessFloorMinutes": 10,
     "feedbackTarget": 10,
     "spendTarget": 10000,
     "budgetSweetSpot": {
