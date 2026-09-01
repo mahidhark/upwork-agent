@@ -33,6 +33,8 @@ export interface JobDetail {
   id: string;
   title: string;
   description: string;
+  /** Hourly postings carry no project budget — search reports 0.0 for them. */
+  jobType: 'fixed' | 'hourly' | null;
   budget: number | null;
   createdDate: string;
   proposalCount: number | null;
@@ -195,16 +197,25 @@ export function screen(
   );
 
   // --- risk 10.e: scope must be plausible for the budget. Hard reject.
-  const budget = job.budget ?? 0;
-  const deliverables = countDeliverables(job.description);
-  const ratio = budget > 0 ? deliverables / (budget / 100) : Infinity;
-  add(
-    'scope_fits_budget',
-    budget > 0 && ratio <= config.maxDeliverablesPer100,
-    budget > 0
-      ? `~${deliverables.toFixed(1)} deliverables for $${budget} (${ratio.toFixed(2)} per $100)`
-      : 'no budget stated',
-  );
+  //
+  // Only meaningful for fixed-price work, where an oversized scope against a
+  // small budget is the trap. Hourly bills as it goes, so the same mismatch is
+  // not the same risk — and hourly postings report a budget of 0, which must
+  // not be read as "a fixed job with a suspiciously missing budget".
+  if (job.jobType === 'hourly') {
+    add('scope_fits_budget', true, 'hourly — billed as worked, gate does not apply');
+  } else {
+    const budget = job.budget ?? 0;
+    const deliverables = countDeliverables(job.description);
+    const ratio = budget > 0 ? deliverables / (budget / 100) : Infinity;
+    add(
+      'scope_fits_budget',
+      budget > 0 && ratio <= config.maxDeliverablesPer100,
+      budget > 0
+        ? `~${deliverables.toFixed(1)} deliverables for $${budget} (${ratio.toFixed(2)} per $100)`
+        : 'no budget stated on a fixed-price posting',
+    );
+  }
 
   return out;
 }

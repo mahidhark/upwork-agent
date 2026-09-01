@@ -8,6 +8,7 @@ const base: JobDetail = {
   id: 'x',
   title: 'x',
   description: 'Build a small automation between two systems.',
+  jobType: 'fixed',
   budget: 600,
   createdDate: '2026-09-01T11:40:00Z',
   proposalCount: 5,
@@ -137,4 +138,29 @@ test('a missing connects cost is a rejection, never a pass (NFR-7)', () => {
 
 test('a missing budget is a rejection, never a pass (NFR-7)', () => {
   assert.equal(gate({ ...base, budget: null }, 'scope_fits_budget').passed, false);
+});
+
+test('an hourly posting is not rejected for having no project budget', () => {
+  // Search reports budget 0.0 on hourly work. That must not read as a
+  // fixed-price job with a suspiciously missing budget — it excluded roughly
+  // half the automation market on the first live config.
+  const job: JobDetail = { ...base, jobType: 'hourly', budget: null };
+  const outcome = gate(job, 'scope_fits_budget');
+  assert.equal(outcome.passed, true, outcome.detail);
+});
+
+test('a fixed posting with no budget is still rejected', () => {
+  const job: JobDetail = { ...base, jobType: 'fixed', budget: null };
+  assert.equal(gate(job, 'scope_fits_budget').passed, false);
+});
+
+test('an hourly posting with an oversized scope still passes the budget gate', () => {
+  // Hourly bills as worked, so scope-versus-budget is not the same trap.
+  const job: JobDetail = {
+    ...base,
+    jobType: 'hourly',
+    budget: null,
+    description: '1. one\n2. two\n3. three\n4. four\nend-to-end, production-ready, from scratch',
+  };
+  assert.equal(gate(job, 'scope_fits_budget').passed, true);
 });

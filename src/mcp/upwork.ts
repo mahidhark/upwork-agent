@@ -83,7 +83,10 @@ export async function getJob(client: Client, orgUid: string, id: string): Promis
         id?: string;
         url?: string;
         content?: { title?: string; description?: string };
-        contractTerms?: { fixedPriceContractTerms?: { amount?: { rawValue?: string } } };
+        contractTerms?: {
+          contractType?: string;
+          fixedPriceContractTerms?: { amount?: { rawValue?: string } };
+        };
         activityStat?: { jobActivity?: { totalHired?: number; invitesSent?: number } };
       };
     };
@@ -96,11 +99,14 @@ export async function getJob(client: Client, orgUid: string, id: string): Promis
 
   const posting = raw.data?.marketplaceJobPosting;
   const amount = posting?.contractTerms?.fixedPriceContractTerms?.amount?.rawValue;
+  const contractType = posting?.contractTerms?.contractType?.toLowerCase();
+  const jobType = contractType === 'hourly' ? 'hourly' : contractType === 'fixed' ? 'fixed' : null;
 
   return {
     id: posting?.id ?? id,
     title: posting?.content?.title ?? '',
     description: posting?.content?.description ?? '',
+    jobType,
     budget: amount == null ? null : Number(amount),
     // The search hit carries created_date; get does not, so the caller supplies it.
     createdDate: new Date().toISOString(),
