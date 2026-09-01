@@ -49,15 +49,39 @@ Early. The MCP connection is live and [the tool surface is mapped](docs/mcp-tool
 
 ## Setup
 
-Requires an Upwork account and an MCP-capable agent.
+Requires Node 22+ and an Upwork account.
 
 ```bash
-claude mcp add --transport http upwork https://mcp.upwork.com/mcp
+npm install
+npm run auth          # authorization UI on 127.0.0.1:3400
 ```
 
-Then run `/mcp` in a Claude Code session to complete the OAuth flow. On a headless host, copy the printed authorization URL into a browser elsewhere.
+Open it and click **Connect Upwork**. One browser approval is unavoidable — Upwork's authorization server advertises `client_credentials` but rejects it at dynamic registration, and an app-level token would carry no freelancer identity in any case. After that approval the refresh token renews silently over outbound HTTPS and no browser is needed again.
 
-Revoke access any time from Upwork → Account Settings → Connected Apps.
+Credentials are written to `~/.upwork-agent` (`0700`, files `0600`), never into this repo.
+
+### Headless hosts
+
+Rather than tunnelling, put the UI behind your existing reverse proxy and point `UPWORK_AGENT_PUBLIC_URL` at the public origin — the OAuth redirect URI is derived from it, so it must match what the browser actually reaches.
+
+```nginx
+location = /upwork-agent { return 301 https://$host/upwork-agent/; }
+location /upwork-agent/ {
+    proxy_pass http://127.0.0.1:3400/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+```bash
+UPWORK_AGENT_PUBLIC_URL=https://example.com/upwork-agent npm run auth
+```
+
+Put it behind HTTP basic auth. The OAuth callback is safe by construction — a code is worthless without the matching PKCE verifier — but the status and disconnect actions should not be public. The callback needs no auth exemption: it arrives via the browser, which already holds the credentials.
+
+If you change the public origin, delete `~/.upwork-agent/client.json` so the client re-registers with the new redirect URI.
+
+Revoke access any time from Upwork → Settings → Connected Apps.
 
 ## Licence
 

@@ -22,6 +22,14 @@ import { newClient, newTransport, toolJson, type Account } from '../mcp/client.j
 const provider = new FileAuthProvider();
 let pendingTransport: ReturnType<typeof newTransport> | undefined;
 
+/**
+ * Links and redirects must be absolute. Behind nginx the path prefix is
+ * stripped before it reaches us, so routing sees "/connect" while the browser
+ * needs "https://host/upwork-agent/connect".
+ */
+const link = (path: string) => `${PUBLIC_ORIGIN}${path}`;
+const HOME = link('/');
+
 // ------------------------------------------------------------------ rendering
 const page = (body: string) => `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -66,7 +74,7 @@ async function statusPage(): Promise<string> {
         <span class="badge off"><span class="dot"></span>Not connected</span>
         <p class="mut">One approval on Upwork. After that this server refreshes its own
         access and never needs a browser again.</p>
-        <p style="margin-top:1.2rem"><a class="btn primary" href="/connect">Connect Upwork</a></p>
+        <p style="margin-top:1.2rem"><a class="btn primary" href="${link('/connect')}">Connect Upwork</a></p>
       </div>
       <div class="card">
         <dl>
@@ -96,7 +104,7 @@ async function statusPage(): Promise<string> {
       <div class="card err">
         <span class="badge off"><span class="dot"></span>Connected, but the server rejected us</span>
         <p class="mut">${esc(err instanceof Error ? err.message : String(err))}</p>
-        <form method="post" action="/disconnect" style="margin-top:1.2rem">
+        <form method="post" action="${link('/disconnect')}" style="margin-top:1.2rem">
           <button class="ghost">Disconnect and start over</button>
         </form>
       </div>`);
@@ -112,7 +120,7 @@ async function statusPage(): Promise<string> {
       </dl>
       <p class="mut" style="margin-top:1.1rem">Access refreshes automatically. Revoke any time from
       Upwork → Settings → Connected Apps.</p>
-      <form method="post" action="/disconnect" style="margin-top:1.2rem">
+      <form method="post" action="${link('/disconnect')}" style="margin-top:1.2rem">
         <button class="ghost">Disconnect</button>
       </form>
     </div>`);
@@ -125,7 +133,7 @@ async function startAuthorization(res: ServerResponse) {
     const client = newClient();
     await client.connect(pendingTransport);
     await client.close();
-    res.writeHead(302, { Location: '/' }).end(); // already authorized
+    res.writeHead(302, { Location: HOME }).end(); // already authorized
     return;
   } catch (err) {
     if (!(err instanceof UnauthorizedError)) throw err;
@@ -139,7 +147,7 @@ async function finishAuthorization(code: string, res: ServerResponse) {
   const transport = pendingTransport ?? newTransport(provider);
   await transport.finishAuth(code);
   pendingTransport = undefined;
-  res.writeHead(302, { Location: '/' }).end();
+  res.writeHead(302, { Location: HOME }).end();
 }
 
 // ---------------------------------------------------------------------- serve
@@ -151,7 +159,7 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
   const route = async () => {
     if (req.method === 'POST' && url.pathname === '/disconnect') {
       provider.clear();
-      return res.writeHead(302, { Location: '/' }).end();
+      return res.writeHead(302, { Location: HOME }).end();
     }
     if (url.pathname === '/connect') return startAuthorization(res);
     if (url.pathname === '/callback') {
@@ -161,7 +169,7 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
         return send(
           page(`<div class="card err"><span class="badge off"><span class="dot"></span>
           Authorization failed</span><p class="mut">${esc(error ?? 'no code returned')}</p>
-          <p style="margin-top:1.2rem"><a class="btn primary" href="/">Back</a></p></div>`),
+          <p style="margin-top:1.2rem"><a class="btn primary" href="${HOME}">Back</a></p></div>`),
         );
       }
       return finishAuthorization(code, res);
@@ -176,7 +184,7 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     send(
       page(`<div class="card err"><span class="badge off"><span class="dot"></span>Something broke</span>
       <p class="mut">${esc(message)}</p>
-      <p style="margin-top:1.2rem"><a class="btn primary" href="/">Back</a></p></div>`),
+      <p style="margin-top:1.2rem"><a class="btn primary" href="${HOME}">Back</a></p></div>`),
     );
   });
 });
