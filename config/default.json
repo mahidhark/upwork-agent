@@ -135,5 +135,9 @@
       "scraping",
       "crm"
     ]
+  },
+  "alerts": {
+    "connectsFloor": 50,
+    "balanceCheckMinutes": 60
   }
 }

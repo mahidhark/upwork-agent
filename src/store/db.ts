@@ -90,6 +90,20 @@ const MIGRATIONS: Array<{ version: number; up: string }> = [
       );
     `,
   },
+  {
+    version: 2,
+    up: `
+      CREATE TABLE alerts (
+        key         TEXT NOT NULL,
+        severity    TEXT NOT NULL,
+        subject     TEXT NOT NULL,
+        sent_at     TEXT NOT NULL,
+        channel     TEXT NOT NULL,
+        error       TEXT
+      );
+      CREATE INDEX alerts_key_sent ON alerts(key, sent_at);
+    `,
+  },
 ];
 
 function migrate(): void {
@@ -215,4 +229,27 @@ export function finishRun(id: number, seen: number, newJobs: number, error?: str
     error ?? null,
     id,
   );
+}
+
+// ------------------------------------------------------------------- alerts
+
+/** Minutes since this alert key was last sent successfully, or null if never. */
+export function minutesSinceAlert(key: string): number | null {
+  const row = db
+    .prepare("SELECT sent_at FROM alerts WHERE key = ? AND error IS NULL ORDER BY sent_at DESC LIMIT 1")
+    .get(key) as { sent_at: string } | undefined;
+  if (!row) return null;
+  return (Date.now() - Date.parse(row.sent_at)) / 60000;
+}
+
+export function recordAlert(
+  key: string,
+  severity: string,
+  subject: string,
+  channel: string,
+  error?: string,
+): void {
+  db.prepare(
+    'INSERT INTO alerts (key, severity, subject, sent_at, channel, error) VALUES (?, ?, ?, ?, ?, ?)',
+  ).run(key, severity, subject, new Date().toISOString(), channel, error ?? null);
 }
