@@ -12,7 +12,8 @@
     "auth": "tsx src/auth/server.ts",
     "test": "node --import tsx --test src/**/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "spike": "tsx spike/mcp-auth.ts"
+    "spike": "tsx spike/mcp-auth.ts",
+    "poll": "tsx src/ingest/poll.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

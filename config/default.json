@@ -1,0 +1,58 @@
+{
+  "pollIntervalSeconds": 180,
+  "maxPagesPerProfile": 2,
+  "screen": {
+    "maxAgeMinutes": 45,
+    "maxProposals": 20,
+    "connectsReserve": 30,
+    "minClientSpend": 1,
+    "minClientFeedbackCount": 1,
+    "maxDeliverablesPer100": 1.5
+  },
+  "profiles": [
+    {
+      "name": "workflow-automation",
+      "query": "Make.com n8n Zapier workflow automation",
+      "job_type": "fixed",
+      "budget_min": 50,
+      "budget_max": 800,
+      "proposals_max": 15,
+      "verified_payment_only": true,
+      "sort": "recency",
+      "limit": 10
+    },
+    {
+      "name": "api-integration",
+      "query": "API integration webhook sync",
+      "job_type": "fixed",
+      "budget_min": 50,
+      "budget_max": 800,
+      "proposals_max": 15,
+      "verified_payment_only": true,
+      "sort": "recency",
+      "limit": 10
+    },
+    {
+      "name": "whatsapp-messaging",
+      "query": "WhatsApp automation chatbot messaging",
+      "job_type": "fixed",
+      "budget_min": 50,
+      "budget_max": 800,
+      "proposals_max": 15,
+      "verified_payment_only": true,
+      "sort": "recency",
+      "limit": 10
+    },
+    {
+      "name": "ai-agents",
+      "query": "AI agent LLM automation OpenAI Claude",
+      "job_type": "fixed",
+      "budget_min": 50,
+      "budget_max": 800,
+      "proposals_max": 15,
+      "verified_payment_only": true,
+      "sort": "recency",
+      "limit": 10
+    }
+  ]
+}

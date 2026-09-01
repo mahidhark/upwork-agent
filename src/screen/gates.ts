@@ -76,14 +76,22 @@ export const DEFAULT_SCREEN_CONFIG: ScreenConfig = {
 const num = (v: string | number | undefined): number =>
   v == null ? 0 : typeof v === 'number' ? v : Number(v) || 0;
 
-/** Text that tries to steer the drafting model rather than instruct an applicant. */
+/**
+ * Text that tries to steer the drafting model rather than instruct an applicant.
+ *
+ * These must match *imperatives aimed at a model*, never topic vocabulary. The
+ * target niche is AI and automation work, where "system prompt", "you are an
+ * assistant" and similar appear as ordinary job requirements — an earlier
+ * version matched /system prompt/ and rejected a legitimate Claude API posting
+ * on its first live run.
+ */
 const AGENT_DIRECTED = [
-  /ignore (all |any )?(your |the )?(previous |prior )?instructions/i,
-  /disregard (the |your )?(above|previous|prior)/i,
-  /you are (an? )?(ai|language model|assistant|chatbot)\b/i,
-  /if you (are|were) (an? )?(ai|bot|llm)/i,
-  /system prompt/i,
-  /reveal your (instructions|prompt|rules)/i,
+  /ignore\s+(all\s+|any\s+)?(your\s+|the\s+)?(previous\s+|prior\s+|above\s+)?instructions/i,
+  /disregard\s+(the\s+|your\s+)?(above|previous|prior)\s+(instructions|prompt|rules)/i,
+  /if\s+you\s+(are|were)\s+(an?\s+)?(ai|bot|llm|language model)/i,
+  /reveal\s+(your|the)\s+(system\s+)?(instructions|prompt|rules)/i,
+  /output\s+your\s+(system\s+)?prompt/i,
+  /\byou\s+must\s+(now\s+)?(say|claim|state)\s+(that\s+)?you\s+(have|are)/i,
 ];
 
 /** Arrangements that produce no completed, paid contract — so no JSS. */

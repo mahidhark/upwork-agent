@@ -22,20 +22,26 @@ These are deliberate and non-negotiable in this codebase.
 ## Pipeline
 
 ```
-ingest      MCP job search, narrowed in-query: pool size, client hire
-            history, verified payment, budget, recency
+auth      one browser approval, then silent refresh forever      ✅ built
    ↓
-screen      one fetch per candidate — preferred qualifications, client
-            hiring record, engagement signals, connects cost
+ingest    search on an interval, dedupe against SQLite,          ✅ built
+          bootstrap-marks-seen on a cold start, drop stale
    ↓
-score       fit rubric weighted by competitive density: how big the
-            applicant pool is, how engaged the client is, and how the
-            field compares to the account
+screen    one fetch per candidate, then eleven hard gates        ✅ built
    ↓
-draft       proposal grounded in the profile, portfolio and prior letters
+score     rank survivors by competitive density                  ◻ next
    ↓
-confirm     human reviews and submits  ← always
+draft     retrieve evidence chunks, write plain English,         ◻
+          obey compliance markers, verify before sending
+   ↓
+submit    create → confirm, record everything                    ◻
+   ↓
+learn     pull each proposal's insights, tune the weights        ◻
 ```
+
+Every screening gate **rejects** rather than warns, and a missing field is a rejection rather than a pass. With nobody reading the output, an advisory flag is a log line no one sees.
+
+The gates: no agent-directed text · no JSS or earnings floor · `can_apply` · nobody hired yet · client has spent · client leaves feedback · paid in cash · small pool · fresh · affordable within the Connects reserve · scope plausible for the budget.
 
 The scoring stage leans on a per-proposal `insights` block the API returns for
 every proposal already submitted: applicant pool size, how many the client
@@ -45,7 +51,21 @@ without waiting on a win history to train against.
 
 ## Status
 
-Early. The MCP connection is live and [the tool surface is mapped](docs/mcp-tool-surface.md). Pipeline stages land next, starting with ingest and screening.
+Auth, storage, ingest and screening are built and running. Scoring, drafting and submission are not.
+
+The [tool surface is mapped](docs/mcp-tool-surface.md) from live schemas rather than documentation, and [the requirements](docs/requirements.md) are stress-tested across ten dimensions with the open decisions resolved.
+
+```bash
+npm run auth            # authorize once
+npm run poll -- --once  # one ingest + screen pass
+npm test                # 19 tests over the screening rubric
+```
+
+Three things the first live runs changed, which is why they were worth doing early:
+
+- **Upwork registers loopback redirect URIs only.** A public HTTPS callback is rejected, so the code is pasted back once instead.
+- **MCP drafts are server-side only.** `manage_proposals create` stages the call; it does not create a draft you can open on upwork.com.
+- **The injection gate matched `"system prompt"`** and rejected a legitimate Claude API posting — ordinary vocabulary in the target niche. Narrowed to imperatives aimed at a model, with tests both ways.
 
 ## Setup
 
