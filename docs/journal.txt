@@ -61,3 +61,66 @@ never run. Kill switch is touch /root/.upwork-agent/STOP, checked before
 anything spends. Six scored jobs remain stranded; auto-apply only fires at
 screening time, so they need a manual npm run apply or nothing will pick them
 up.
+
+
+2026-09-01 (cont.) — went live, first submission, tone feedback
+---------------------------------------------------------------
+Flipped autoApply.live to true at 21:31 UTC and restarted the poller. The
+restart landed mid-draft on a job that had just cleared every gate — "API
+Integration with Trellis Law", 69.5, zero proposals, hourly $15-35 — and killed
+the apply in flight. The job was left in `scored`, which nothing sweeps, so it
+was stranded within minutes of that exact failure mode being written up in
+docs/database.md. Restarting without checking for an in-flight apply is the
+mistake; there is no drain and nothing retries.
+
+Recovered it by hand. The re-screen at submit refused it on freshness (14 min
+old, window 10), correctly — it was only stale because of the restart. Applied
+with UPWORK_AGENT_CONFIG pointed at a scratch config with a wider window, which
+leaves the running poller untouched: no restart, no interval where the live
+agent might bid on stale postings itself. Every other gate stayed in force.
+
+    SUBMITTED — 2094904162340335617 · $20/hr · 20 connects · letter 3763 chars
+
+That is confirm_draft executing for the first time. It works. Every stage of
+the pipeline has now run in production, including the one that spends money.
+
+Connects cost 20, not the 8-13 estimated from the earlier $9 draft. Upwork
+prices per posting and the spread is wide. At maxPerDay 3 a full day is closer
+to 60 connects than 40, so against a 147 balance and connectsReserve 30 the
+agent has roughly two days of unattended running before it stops itself. Worth
+deciding whether maxPerDay 3 is right before a full soak rather than after.
+
+Operator feedback on the drafting: the letters read as too dramatic. Not fixed
+this session, recorded for the next one. The register is structural rather than
+incidental, so it is a prompt problem in draft/compose.ts and
+draft/instructions.ts, not a wording tweak. From the submitted letter:
+
+  - ALL-CAPS section headers throughout: "THE PART THAT BREAKS ISN'T THE API
+    CALLS", "WORK THAT LOOKS LIKE YOURS", "WHAT I HAVEN'T DONE".
+  - Opens on a contrarian negation and a stakes-raising hook rather than on the
+    work: "The thing that will actually cost you money is a new case appearing
+    at 2am and nothing happening."
+  - Vivid worst-case imagery: "you eventually SMS the wrong person about a
+    lawsuit".
+  - Aphoristic closers: "silent failure is worse than no delivery", "the
+    version you can trust on a Monday morning".
+  - Escalating fragments and arrow bullets used for rhythm.
+
+The underlying content is sound — specific, honest about gaps, ends on a real
+question. It is the delivery that overreaches. Whoever picks this up should
+change the tone instructions and compare against this letter as the before.
+
+Also still open from earlier in the session:
+  - Six jobs stranded in `scored`; nothing sweeps that state.
+  - The connectsBalance crash at 15:53 remains unguarded.
+  - README.md still says scoring, drafting and submission are "not built" and
+    quotes 19 tests. All three are built and there are 80. Stale, not touched.
+
+Files
+  config/default.json    autoApply.live true
+  CLAUDE.md              (new)  repo had none
+  docs/architecture.md   (new)
+  docs/database.md       (new)
+  docs/journal.txt       this entry
+
+Tests: 80, unchanged. npm run typecheck clean.
