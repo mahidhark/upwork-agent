@@ -7,6 +7,9 @@ export const MCP_SERVER_URL = process.env.UPWORK_MCP_URL ?? 'https://mcp.upwork.
 /** Where tokens and client registration live. Never inside the repo. */
 export const STORE_DIR = process.env.UPWORK_AGENT_STORE ?? join(homedir(), '.upwork-agent');
 
+/** SQLite state. Outside the repo by default; `data/` is gitignored anyway. */
+export const DB_PATH = process.env.UPWORK_AGENT_DB ?? join(STORE_DIR, 'agent.db');
+
 /** Port the auth UI listens on. */
 export const AUTH_PORT = Number(process.env.UPWORK_AGENT_PORT ?? 3400);
 
