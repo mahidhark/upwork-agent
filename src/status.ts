@@ -97,11 +97,21 @@ if (pending.length) {
   console.log();
 }
 
-const rejects = q<{ reason: string; n: number }>(`
-  SELECT gate AS reason, COUNT(*) AS n FROM screenings WHERE passed = 0 GROUP BY gate ORDER BY n DESC LIMIT 8
+// A gate NAME alone is ambiguous wherever one name covers two job types:
+// `rate_acceptable` fires both for an hourly rate under `minHourlyRate` and a
+// fixed budget under `minFixedBudget`, so a rising count cannot tell you which
+// floor is doing the work. MAX(checked_at) makes SQLite take the bare `detail`
+// column from that same newest row, so each count carries an example of what
+// most recently tripped it.
+const rejects = q<{ reason: string; n: number; example: string | null }>(`
+  SELECT gate AS reason, COUNT(*) AS n, detail AS example, MAX(checked_at)
+  FROM screenings WHERE passed = 0 GROUP BY gate ORDER BY n DESC LIMIT 8
 `);
 if (rejects.length) {
   console.log(`  TOP REJECTION REASONS`);
-  for (const r of rejects) console.log(`    ${String(r.n).padStart(4)}  ${r.reason}`);
+  for (const r of rejects) {
+    const example = r.example ? `  latest: ${r.example.slice(0, 52)}` : '';
+    console.log(`    ${String(r.n).padStart(4)}  ${r.reason.padEnd(23)}${example}`);
+  }
   console.log();
 }
