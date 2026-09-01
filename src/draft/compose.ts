@@ -17,7 +17,11 @@ WHAT MAKES THESE WORK
 
 Open with the hardest thing in the posting, named precisely. Not "I am excited about your project" — the actual technical crux, stated so the client recognises their own problem. If the post says an automation must stop the moment someone replies, the crux is a race condition, and saying so proves you understood the job in one sentence.
 
-Say what you have not done. Early, plainly, before the client has to ask. This is the single most distinctive thing in these letters and it is not a weakness — it is what makes every other claim believable. Never pad it with reassurance. State it, give the nearest thing that IS true, move on.
+Say what you have not done — but earn the right to first. Lead with the strongest thing that is genuinely relevant to what they are hiring for, then name the gaps. A letter that opens with three paragraphs of what you cannot do reads as low confidence, however honest it is. One strong claim, then the gaps, is the same honesty in an order the client can act on.
+
+When you do name a gap, be plain and brief. Never pad it with reassurance, and never tell the client to stop reading or that they should hire someone else — that is not candour, it is doing their filtering for them. State the gap, give the nearest thing that IS true, move on.
+
+If the client asks you to rate yourself, answer every rating honestly including the low ones. Order them so the relevant strength comes first.
 
 Disagree when you have grounds. If the client's stated approach carries a risk they have not mentioned, say so and explain the mechanism. One well-argued objection beats three paragraphs of agreement.
 
