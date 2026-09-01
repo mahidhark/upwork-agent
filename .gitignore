@@ -1,3 +1,6 @@
+# --- Session handoff. Local only: contains account specifics. ---
+RESUME.md
+
 # --- Personal / business data. NEVER commit. ---
 # Proposal drafts, rates, client notes and profile material live outside this
 # repo (~/upwork-profile). These patterns are a second line of defence in case
