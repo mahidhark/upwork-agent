@@ -336,10 +336,11 @@ own terminal-state list.
   ~480 search calls/day plus screening calls. **ACTIONABLE §NFR-3** — this is an
   assumption, not a fact, and the conservative default plus backoff exists
   because of it.
-- 2.b: **Server-side draft TTL is unknown.** Nothing in the tool help states how
-  long a `draft_id` remains confirmable. **[Mahi-verify]** — affects FR-18's
-  expiry window. Until known, expire locally well inside any plausible server
-  window.
+- 2.b: **Server-side draft TTL is unknown**, and **v1.1 makes it moot.** Nothing
+  in the tool help states how long a `draft_id` stays confirmable, but with
+  automatic submission the gap between `create` and `confirm_draft` is seconds,
+  so no plausible TTL binds. Downgraded from blocker to non-issue. It would
+  return as a real constraint only if a human approval step were reintroduced.
 - 2.c: **Whether Upwork permits a second concurrent OAuth authorisation** for the
   same account (an existing Claude Code session plus this daemon).
   **[Mahi-verify]** — if not, the daemon and interactive use conflict.
@@ -447,7 +448,7 @@ sub-analysis **does** apply — §8 adds a job lifecycle state set.
 | 10.b Prompt injection produces a false claim in an approved letter | Medium × high | 4.a mitigations plus the human approval step. |
 | 10.c Connects exhausted on mediocre jobs | Medium × medium | FR-9 caps; scoring ranks rather than accepts all. |
 | 10.d LLM drafts erode the letters' distinctiveness | Medium × medium | Corpus as exemplars; operator edits via FR-16. Accepted — quality is reviewable before every send. |
-| 10.e Over-committing to a job too large for its budget → bad first review | Medium × **severe** | **Worsened by full automation.** FR-8's scope flag was designed as advisory with a human deciding. There is no human. Either the flag becomes a hard reject, or the risk is knowingly accepted. **[Mahi-verify]** |
+| 10.e Over-committing to a job too large for its budget → bad first review | Medium × **severe** | **RESOLVED 2026-09-01: the scope flag becomes a hard reject.** Without a human, an advisory flag is a log line nobody reads. The asymmetry decides it — a missed bid costs nothing, while a contract taken and not finished poisons a blank profile for months. Threshold configurable; every rejection recorded with its reasoning so the threshold can be tuned against real postings. Erring toward false rejects is correct while Connects are the binding constraint anyway. |
 | 10.f `insights` disappears, removing the only feedback signal | Low × medium | 2.e — tolerate absence. |
 | 10.g Automated submission conflicts with Upwork's Terms | Medium × **severe** | Accepted deliberately by the operator (README constraint 1). No mitigation beyond conservative volume: FR-9 caps, and a `--dry-run` default on first deploy. An account with no reputation has the least room to absorb a warning. |
 | 10.h A bad letter reaches a client with nobody having read it | Medium × high | FR-14 verification gate, FR-13 injection handling, corpus grounding, FR-18 record and FR-19 after-the-fact email. None of these is as good as a person reading it, and that trade is the point of the decision. |
@@ -462,11 +463,39 @@ locks, since each can change the design.
 
 ---
 
-## 10. Open decisions
+## 10. Decisions
 
-1. **Drafting model.** A faster model roughly halves NFR-1's largest variable
-   component; a stronger one better preserves the letters' distinctiveness.
-   Configurable either way, but the default needs choosing.
-2. **Review surface first.** CLI is fastest to build; the web view is what makes
-   five-minutes-from-a-phone actually true. CLI first is the recommendation.
-3. **The three [Mahi-verify] items** in §9.11.
+Resolved 2026-09-01. Each is configurable; these are the defaults.
+
+1. **Drafting model: Opus 5** (`claude-opus-5`). With no human editing the
+   letter before it goes out, quality matters more than it would behind an
+   approval step, and the latency budget has room — 90s average poll wait plus
+   ~10s of screening plus a ~60s draft is still under three minutes against a
+   five-minute target. Prompt caching (NFR-2) keeps the static corpus cheap.
+2. **Instruction extraction: Sonnet 5** (`claude-sonnet-5`). FR-13's pass emits
+   a small structured list from the posting. Mechanical, schema-constrained,
+   and wants speed rather than prose judgement.
+3. **No review surface.** FR-15's web view is dropped from v1 — there is no
+   approval to collect. Replaced by FR-19's after-the-fact email, which is a
+   report rather than a gate.
+4. **Scope-to-budget is a hard reject**, not an advisory flag. See risk 10.e.
+5. **Draft TTL (2.b): closed as moot** under automatic submission.
+6. **First deployment runs `--dry-run`** (NFR-7). It drafts, records and emails
+   without submitting, until the recorded output has been read against real
+   postings for long enough to trust the gates.
+
+### Still genuinely open
+
+Two are empirical and get answered by the Stage 0 spike rather than decided:
+
+- **2.c concurrent OAuth** — whether Upwork permits a second authorisation for
+  an account that already has an interactive session. The spike answers it.
+- **MCP transport from a standalone process** — assumed to work via the official
+  TypeScript SDK; unproven until it prints a job list.
+
+Two need an action from the operator, not a decision:
+
+- An **`ANTHROPIC_API_KEY`** on the staging host. Not currently in the
+  environment.
+- **One SSH tunnel command** during first-time OAuth, so the browser callback
+  reaches the headless box: `ssh -L 8790:localhost:8790 root@<staging>`.
