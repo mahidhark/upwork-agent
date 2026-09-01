@@ -117,6 +117,7 @@ export async function getJob(client: Client, orgUid: string, id: string): Promis
     hourlyMin: hourly?.hourlyBudgetMin ?? null,
     hourlyMax: hourly?.hourlyBudgetMax ?? null,
     proposalCountInferred: false,
+    screeningQuestions: raw.screening_questions ?? [],
     // The search hit carries created_date; get does not, so the caller supplies it.
     createdDate: new Date().toISOString(),
     proposalCount: null,

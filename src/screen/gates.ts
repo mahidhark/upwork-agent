@@ -48,6 +48,13 @@ export interface JobDetail {
    * genuinely unknown.
    */
   proposalCountInferred: boolean;
+  /**
+   * Upwork's own structured screening questions. Distinct from questions the
+   * extraction pass finds in the description prose: `answers` may only be sent
+   * to create when these exist, because Upwork will not accept answers to
+   * questions it does not have.
+   */
+  screeningQuestions: string[];
   createdDate: string;
   proposalCount: number | null;
   canApply: boolean;
