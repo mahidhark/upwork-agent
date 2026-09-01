@@ -119,9 +119,45 @@ function renderInstructions(i: Instructions): string {
   return lines.join('\n') || 'The posting carries no explicit applicant instructions.';
 }
 
+/**
+ * Compose, retrying on length.
+ *
+ * A model cannot count its own output, so a prompt instruction is a hope, not a
+ * control — two consecutive drafts landed at 98% of the cap despite an explicit
+ * target. Verification rejects an over-length letter outright, throwing away a
+ * draft that was already paid for, so the overage is measured and fed back
+ * instead.
+ */
 export async function composeLetter(
   input: ComposeInput,
   client = new Anthropic(),
+  maxAttempts = 3,
+): Promise<string> {
+  let feedback = '';
+  let last = '';
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    last = await composeOnce(input, feedback, client);
+    if (last.length <= MAX_COVER_LETTER) return last;
+
+    const over = last.length - MAX_COVER_LETTER;
+    feedback =
+      `\n\nYour previous attempt was ${last.length} characters — ${over} over the hard limit ` +
+      `of ${MAX_COVER_LETTER}, which means it would be rejected and never sent. ` +
+      `Cut at least ${over + 400} characters. Remove whole paragraphs that repeat a point ` +
+      `already made rather than trimming words evenly; a shorter letter that argues one ` +
+      `thing well beats a long one that argues three.`;
+  }
+
+  // Every attempt overran. Return the last one and let verification refuse it,
+  // so the failure is visible rather than silently truncated mid-sentence.
+  return last;
+}
+
+async function composeOnce(
+  input: ComposeInput,
+  feedback: string,
+  client: Anthropic,
 ): Promise<string> {
   const response = await client.messages.create({
     model: DRAFT_MODEL,
@@ -149,7 +185,7 @@ ${input.posting}
 
 He is bidding $${input.bid}${input.budget ? ` against a stated budget of $${input.budget}` : ''}. Mention the figure once, near the end.
 
-Write the cover letter.`,
+Write the cover letter.${feedback}`,
       },
     ],
   });

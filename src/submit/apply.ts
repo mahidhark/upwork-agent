@@ -28,6 +28,7 @@ import { loadCorpus, retrieve, render } from '../draft/corpus.js';
 import { extractInstructions } from '../draft/instructions.js';
 import { composeLetter } from '../draft/compose.js';
 import { verifyLetter } from '../draft/verify.js';
+import { answerScreeningQuestions } from '../draft/answers.js';
 import { decideBoost } from './boost.js';
 import { recordProposal, submittedSince, setState, getJobRow } from '../store/db.js';
 
@@ -129,14 +130,27 @@ async function main() {
   }
   console.log(`  ${letter.length} chars · markers present · grounded in ${matched.length + always.length} chunks`);
 
+  // Only Upwork's OWN screening_questions may be answered. Questions the
+  // extraction pass found in the description prose are answered inside the
+  // letter instead — Upwork will not accept answers to questions it does not
+  // have, and a stubbed "see cover letter" is the first thing a client reads.
+  let answers: Array<{ question: string; answer: string }> = [];
+  if (job.screeningQuestions.length) {
+    step(`answering ${job.screeningQuestions.length} screening questions`);
+    answers = await answerScreeningQuestions({
+      questions: job.screeningQuestions,
+      posting: job.description,
+      evidence: render(always, matched),
+    });
+    for (const a of answers) console.log(`  Q ${a.question.slice(0, 60)}\n  A ${a.answer.slice(0, 90)}`);
+  }
+
   step('creating draft');
   const preview = await createProposal(client, orgUid, {
     job_reference: jobId!,
     cover_letter: letter,
     charged_amount: bid,
-    ...(instructions.questions.length
-      ? { answers: instructions.questions.map((q) => ({ question: q, answer: 'See cover letter.' })) }
-      : {}),
+    ...(answers.length ? { answers } : {}),
   });
   console.log(`  draft ${preview.draft_id} · ${preview.connects_cost} connects · can_apply ${preview.can_apply}`);
 

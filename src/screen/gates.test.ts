@@ -12,6 +12,7 @@ const base: JobDetail = {
   hourlyMin: null,
   hourlyMax: null,
   proposalCountInferred: false,
+  screeningQuestions: [],
   budget: 600,
   createdDate: '2026-09-01T11:40:00Z',
   proposalCount: 5,
