@@ -89,6 +89,8 @@ export interface ScreenConfig {
   maxDeliverablesPer100: number;
   /** Lowest hourly rate worth bidding, in dollars. */
   minHourlyRate: number;
+  /** Lowest fixed-price budget worth bidding, in dollars. */
+  minFixedBudget: number;
   /** Hours logged on Upwork. Zero while the account is fixed-price only. */
   hoursWorked: number;
   /** FR-9: submissions allowed in a rolling 24 hours. */
@@ -109,6 +111,7 @@ export const DEFAULT_SCREEN_CONFIG: ScreenConfig = {
   minClientFeedbackCount: 1,
   maxDeliverablesPer100: 1.5,
   minHourlyRate: 15,
+  minFixedBudget: 50,
   hoursWorked: 0,
 };
 
@@ -313,6 +316,21 @@ export function screen(
       budget > 0 && ratio <= config.maxDeliverablesPer100,
       budget > 0
         ? `~${deliverables.toFixed(1)} deliverables for $${budget} (${ratio.toFixed(2)} per $100)`
+        : 'no budget stated on a fixed-price posting',
+    );
+
+    // The scope gate above is a RATIO, so it cannot floor the budget: a vague
+    // posting yields zero deliverables, a ratio of zero, and sails through at
+    // any budget at all. That is how a $10 posting scored 76.2 and built a
+    // draft that would have spent 8 Connects to bid $9.
+    //
+    // Hourly work has `minHourlyRate` for this. Fixed-price needs its own
+    // absolute floor, judged on the budget alone and never on the description.
+    add(
+      'rate_acceptable',
+      budget >= config.minFixedBudget,
+      budget > 0
+        ? `fixed budget $${budget}, floor $${config.minFixedBudget}`
         : 'no budget stated on a fixed-price posting',
     );
   }

@@ -9,6 +9,7 @@
     "minClientFeedbackCount": 1,
     "maxDeliverablesPer100": 1.5,
     "minHourlyRate": 15,
+    "minFixedBudget": 50,
     "hoursWorked": 0,
     "maxPerDay": 3,
     "maxBoostConnects": 10,
