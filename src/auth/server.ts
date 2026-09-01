@@ -126,6 +126,12 @@ async function statusPage(): Promise<string> {
     </div>`);
 }
 
+/**
+ * Upwork only registers loopback redirect URIs, so on a headless host the
+ * browser cannot deliver the code back to us. It lands on a dead
+ * http://localhost page instead — with the code sitting in the address bar.
+ * Pasting that URL back is the standard flow for exactly this situation.
+ */
 async function startAuthorization(res: ServerResponse) {
   provider.lastAuthorizationUrl = undefined;
   pendingTransport = newTransport(provider);
@@ -140,7 +146,59 @@ async function startAuthorization(res: ServerResponse) {
   }
   const authUrl = provider.takeAuthorizationUrl();
   if (!authUrl) throw new Error('the SDK did not produce an authorization URL');
-  res.writeHead(302, { Location: authUrl.toString() }).end();
+
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(
+    page(`
+      <div class="card">
+        <p style="margin:0 0 1.1rem"><a class="btn primary" href="${esc(authUrl.toString())}"
+           target="_blank" rel="noreferrer">Approve on Upwork</a></p>
+        <p class="mut">Opens in a new tab. After you approve, your browser lands on a
+        <strong>page that will not load</strong> — an address starting
+        <code>${esc(REDIRECT_URL)}</code>. That is expected: Upwork only permits
+        loopback redirects, and nothing is listening on your machine.</p>
+        <p class="mut">Copy that whole address from the bar and paste it below.</p>
+      </div>
+      <div class="card">
+        <form method="post" action="${link('/complete')}">
+          <label class="mut" for="pasted">Pasted address (or just the code)</label>
+          <input id="pasted" name="pasted" required autocomplete="off" spellcheck="false"
+                 placeholder="${esc(REDIRECT_URL)}?code=…"
+                 style="width:100%;margin:.5rem 0 1rem;padding:.6rem .7rem;border-radius:8px;
+                        border:1px solid var(--line);background:var(--bg);color:var(--fg);
+                        font:.86rem ui-monospace,SFMono-Regular,Menlo,monospace">
+          <button class="primary">Finish connecting</button>
+        </form>
+      </div>`),
+  );
+}
+
+/** Pull the authorization code out of a pasted redirect URL, or accept it bare. */
+function extractCode(pasted: string): string {
+  const trimmed = pasted.trim();
+  if (!trimmed) throw new Error('nothing was pasted');
+  try {
+    const parsed = new URL(trimmed);
+    const error = parsed.searchParams.get('error');
+    if (error) throw new Error(`Upwork returned an error: ${error}`);
+    const code = parsed.searchParams.get('code');
+    if (code) return code;
+    throw new Error('that address has no "code" parameter — copy the whole address bar');
+  } catch (err) {
+    if (err instanceof TypeError) return trimmed; // not a URL, assume a bare code
+    throw err;
+  }
+}
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+      if (body.length > 8192) reject(new Error('request body too large'));
+    });
+    req.on('end', () => resolve(body));
+    req.on('error', reject);
+  });
 }
 
 async function finishAuthorization(code: string, res: ServerResponse) {
@@ -160,6 +218,10 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     if (req.method === 'POST' && url.pathname === '/disconnect') {
       provider.clear();
       return res.writeHead(302, { Location: HOME }).end();
+    }
+    if (req.method === 'POST' && url.pathname === '/complete') {
+      const pasted = new URLSearchParams(await readBody(req)).get('pasted') ?? '';
+      return finishAuthorization(extractCode(pasted), res);
     }
     if (url.pathname === '/connect') return startAuthorization(res);
     if (url.pathname === '/callback') {

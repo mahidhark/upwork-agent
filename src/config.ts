@@ -19,4 +19,16 @@ export const PUBLIC_ORIGIN = (
   process.env.UPWORK_AGENT_PUBLIC_URL ?? `http://localhost:${AUTH_PORT}`
 ).replace(/\/$/, '');
 
-export const REDIRECT_URL = `${PUBLIC_ORIGIN}/callback`;
+/**
+ * OAuth redirect URI. Upwork's dynamic registration accepts **loopback only** —
+ * probed 2026-09-01: http://localhost:PORT/callback and http://127.0.0.1:PORT/
+ * are accepted, while any public https origin and the oob URN are rejected with
+ * "One or more redirect URIs are invalid".
+ *
+ * So this stays loopback even when the UI is served publicly. On a headless
+ * host the browser cannot reach it, and the code is pasted back instead — see
+ * the /connect page. If you do forward the port, /callback still completes on
+ * its own.
+ */
+export const REDIRECT_URL =
+  process.env.UPWORK_AGENT_REDIRECT_URL ?? `http://localhost:${AUTH_PORT}/callback`;

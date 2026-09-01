@@ -62,7 +62,11 @@ Credentials are written to `~/.upwork-agent` (`0700`, files `0600`), never into 
 
 ### Headless hosts
 
-Rather than tunnelling, put the UI behind your existing reverse proxy and point `UPWORK_AGENT_PUBLIC_URL` at the public origin — the OAuth redirect URI is derived from it, so it must match what the browser actually reaches.
+**Upwork only registers loopback redirect URIs.** Probed against the live registration endpoint on 2026-09-01: `http://localhost:PORT/callback` and `http://127.0.0.1:PORT/callback` are accepted; any public HTTPS origin and the `oob` URN are rejected with *"One or more redirect URIs are invalid"*. So the redirect stays on loopback no matter where the UI is served.
+
+That means on a headless host the browser cannot deliver the code back. The UI handles it the way CLI tools do: you approve on Upwork, land on a `localhost` page that will not load, and paste that address back into the UI, which reads the code out of it. No tunnel, nothing copied between machines.
+
+Serve the UI itself through your reverse proxy and set `UPWORK_AGENT_PUBLIC_URL` so its own links resolve. That variable does **not** affect the redirect URI.
 
 ```nginx
 location = /upwork-agent { return 301 https://$host/upwork-agent/; }
