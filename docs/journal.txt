@@ -1,0 +1,63 @@
+upwork-agent journal
+====================
+
+Newest entry last. One entry per session: what changed, which files, test delta.
+
+
+2026-09-01 — fixed-price floor, gate-detail reporting, go live
+--------------------------------------------------------------
+Resumed monitoring after a session disconnect. The agent had kept running
+throughout: poller and auth online under pm2, working tree clean, nothing lost.
+
+Found and closed a hole in screening. At 20:09 a $10 fixed-price GoHighLevel
+posting cleared every gate, scored 76.2 — second-highest recorded — and built a
+draft that would have spent 8 Connects to bid $9. Only autoApply.live being
+false kept it from submitting.
+
+Root cause: scope_fits_budget measures deliverables per $100. Being a ratio, it
+can only judge scope relative to budget and cannot floor the budget itself. A
+posting with no countable deliverables yields a ratio of zero and passes at any
+budget at all. Hourly work already had minHourlyRate; fixed-price had nothing.
+
+Fixed with minFixedBudget ($50), emitted under the existing rate_acceptable
+gate name so "the money is too small" stays one rejection reason across both
+job types. The check reads the budget alone and never the description, so no
+phrasing can buy a tiny budget past it.
+
+That naming choice created a second, smaller problem: with one gate name
+covering two job types, a rising counter could not tell you which floor was
+doing the work — the new floor was invisible in the status report from the
+moment it shipped. Closed by carrying the newest detail string alongside each
+count. First run confirmed the floor working in the wild:
+
+    14  rate_acceptable          latest: fixed budget $10, floor $50
+
+Flipped autoApply.live to true at 21:31 UTC on the operator's decision, with
+the confirm_draft step still never having executed. Everything upstream is
+proven in production; the act of submitting is not.
+
+Also observed, not fixed: a single poller crash at 15:53 on an unguarded read
+of connectsBalance from the account payload. One occurrence, self-healed via
+backoff, not recurring. It will recur eventually.
+
+Files
+  src/screen/gates.ts        (+18 -0)   minFixedBudget config + fixed-price gate
+  src/screen/gates.test.ts   (+22 -0)   3 tests
+  config/default.json        (+3 -2)    minFixedBudget 50; autoApply.live true
+  src/status.ts              (+13 -3)   newest detail per rejection reason
+  docs/journal.txt           (new)      this file
+
+Commits
+  3d44469  fix(screen): floor fixed-price budgets, which the ratio gate could not
+  aa95e03  fix(status): show what tripped each gate, not just how often
+           feat(submit): go live — auto-apply now submits
+  merged as PR #15 (76b7407), PR #16 (eec8d33); PR #17 open
+
+Tests: 77 -> 80. Added 3, removed 0. npm run typecheck clean.
+Note: this repo has no build script; typecheck is the equivalent gate.
+
+Next: soak test 2026-09-02. Watch the first live submission — confirm_draft has
+never run. Kill switch is touch /root/.upwork-agent/STOP, checked before
+anything spends. Six scored jobs remain stranded; auto-apply only fires at
+screening time, so they need a manual npm run apply or nothing will pick them
+up.
