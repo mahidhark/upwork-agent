@@ -7,7 +7,9 @@
     "connectsReserve": 30,
     "minClientSpend": 1,
     "minClientFeedbackCount": 1,
-    "maxDeliverablesPer100": 1.5
+    "maxDeliverablesPer100": 1.5,
+    "minHourlyRate": 15,
+    "hoursWorked": 0
   },
   "profiles": [
     {
@@ -150,7 +152,11 @@
       "automation",
       "scraping",
       "crm"
-    ]
+    ],
+    "hourlySweetSpot": {
+      "min": 20,
+      "max": 60
+    }
   },
   "alerts": {
     "connectsFloor": 50,

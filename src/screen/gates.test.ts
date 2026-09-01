@@ -9,6 +9,8 @@ const base: JobDetail = {
   title: 'x',
   description: 'Build a small automation between two systems.',
   jobType: 'fixed',
+  hourlyMin: null,
+  hourlyMax: null,
   budget: 600,
   createdDate: '2026-09-01T11:40:00Z',
   proposalCount: 5,
@@ -144,7 +146,7 @@ test('an hourly posting is not rejected for having no project budget', () => {
   // Search reports budget 0.0 on hourly work. That must not read as a
   // fixed-price job with a suspiciously missing budget — it excluded roughly
   // half the automation market on the first live config.
-  const job: JobDetail = { ...base, jobType: 'hourly', budget: null };
+  const job: JobDetail = { ...base, jobType: 'hourly', budget: null, hourlyMax: 40 };
   const outcome = gate(job, 'scope_fits_budget');
   assert.equal(outcome.passed, true, outcome.detail);
 });
@@ -160,7 +162,63 @@ test('an hourly posting with an oversized scope still passes the budget gate', (
     ...base,
     jobType: 'hourly',
     budget: null,
+    hourlyMax: 40,
     description: '1. one\n2. two\n3. three\n4. four\nend-to-end, production-ready, from scratch',
   };
   assert.equal(gate(job, 'scope_fits_budget').passed, true);
+});
+
+test('an hourly posting below the rate floor is rejected', () => {
+  // The real "Make.com + HubSpot" posting offered $10-15/hr.
+  const job: JobDetail = { ...base, jobType: 'hourly', budget: null, hourlyMin: 10, hourlyMax: 15 };
+  assert.equal(gate(job, 'rate_acceptable').passed, false);
+});
+
+test('an hourly posting whose range starts at or above the floor passes', () => {
+  const job: JobDetail = { ...base, jobType: 'hourly', budget: null, hourlyMin: 15, hourlyMax: 30 };
+  assert.equal(gate(job, 'rate_acceptable').passed, true);
+});
+
+test('the bottom of the range decides, not the top', () => {
+  // "$10-30/hr depending on experience" pays an unrated freelancer $10.
+  // Judging on the ceiling is how you end up working at the floor.
+  const job: JobDetail = { ...base, jobType: 'hourly', budget: null, hourlyMin: 10, hourlyMax: 30 };
+  assert.equal(gate(job, 'rate_acceptable').passed, false);
+});
+
+test('an hourly posting with no rate stated is rejected, never passed', () => {
+  const job: JobDetail = { ...base, jobType: 'hourly', budget: null, hourlyMin: null, hourlyMax: null };
+  assert.equal(gate(job, 'rate_acceptable').passed, false);
+});
+
+test('a minimum-hours floor disqualifies — fixed-price work logs no hours', () => {
+  // The exact shape that slipped through: JSS and earnings clear, hours do not.
+  const job: JobDetail = {
+    ...base,
+    preferredQualifications: { min_job_success_score: 0, min_earnings: 'Any', min_hours_worked: 100 },
+  };
+  const outcome = gate(job, 'eligible');
+  assert.equal(outcome.passed, false, outcome.detail);
+  assert.match(outcome.detail, /100h/);
+});
+
+test('a Rising Talent requirement disqualifies', () => {
+  const job: JobDetail = { ...base, preferredQualifications: { rising_talent: true } };
+  assert.equal(gate(job, 'eligible').passed, false);
+});
+
+test('all four qualification floors are reported together', () => {
+  const job: JobDetail = {
+    ...base,
+    preferredQualifications: {
+      min_job_success_score: 90,
+      min_earnings: '$1,000+',
+      min_hours_worked: 100,
+      rising_talent: true,
+    },
+  };
+  const detail = gate(job, 'eligible').detail;
+  for (const expected of ['JSS 90', 'earnings', '100h', 'Rising Talent']) {
+    assert.ok(detail.includes(expected), `missing ${expected} in: ${detail}`);
+  }
 });

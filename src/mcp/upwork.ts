@@ -86,6 +86,11 @@ export async function getJob(client: Client, orgUid: string, id: string): Promis
         contractTerms?: {
           contractType?: string;
           fixedPriceContractTerms?: { amount?: { rawValue?: string } };
+          hourlyContractTerms?: {
+            hourlyBudgetMin?: number;
+            hourlyBudgetMax?: number;
+            engagementType?: string;
+          };
         };
         activityStat?: { jobActivity?: { totalHired?: number; invitesSent?: number } };
       };
@@ -101,6 +106,7 @@ export async function getJob(client: Client, orgUid: string, id: string): Promis
   const amount = posting?.contractTerms?.fixedPriceContractTerms?.amount?.rawValue;
   const contractType = posting?.contractTerms?.contractType?.toLowerCase();
   const jobType = contractType === 'hourly' ? 'hourly' : contractType === 'fixed' ? 'fixed' : null;
+  const hourly = posting?.contractTerms?.hourlyContractTerms;
 
   return {
     id: posting?.id ?? id,
@@ -108,6 +114,8 @@ export async function getJob(client: Client, orgUid: string, id: string): Promis
     description: posting?.content?.description ?? '',
     jobType,
     budget: amount == null ? null : Number(amount),
+    hourlyMin: hourly?.hourlyBudgetMin ?? null,
+    hourlyMax: hourly?.hourlyBudgetMax ?? null,
     // The search hit carries created_date; get does not, so the caller supplies it.
     createdDate: new Date().toISOString(),
     proposalCount: null,
