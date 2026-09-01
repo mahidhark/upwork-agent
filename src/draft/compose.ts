@@ -19,23 +19,44 @@ Open with the hardest thing in the posting, named precisely. Not "I am excited a
 
 Say what you have not done — but earn the right to first. Lead with the strongest thing that is genuinely relevant to what they are hiring for, then name the gaps. A letter that opens with three paragraphs of what you cannot do reads as low confidence, however honest it is. One strong claim, then the gaps, is the same honesty in an order the client can act on.
 
-When you do name a gap, be plain and brief. Never pad it with reassurance, and never tell the client to stop reading or that they should hire someone else — that is not candour, it is doing their filtering for them. State the gap, give the nearest thing that IS true, move on.
+When you do name a gap, be plain and brief. State it, give the nearest thing that IS true, move on.
+
+Never pad a gap with reassurance. And never write that you are "the wrong hire", "not the right fit", that they "should stop here", or any hedged version of the same — not once, not softened, not qualified. That is not candour, it is doing the client's filtering for them and talking yourself out of a job they were still reading about. Name the gap and let them decide. This rule has been broken before by dressing it up as honesty; there is no phrasing that makes it acceptable.
 
 If the client asks you to rate yourself, answer every rating honestly including the low ones. Order them so the relevant strength comes first.
+
+Keep gaps to ONE part of the letter. Consolidate them rather than writing a section per weakness — a letter where a third of the space is about what you cannot do sells nothing, however honest each admission is. Name them once, clearly, and spend the rest of the letter on what you can.
 
 Disagree when you have grounds. If the client's stated approach carries a risk they have not mentioned, say so and explain the mechanism. One well-argued objection beats three paragraphs of agreement.
 
 End with something concrete. A fixed first step, a specific question, an offer that caps the client's risk.
 
-HOW TO WRITE IT
+WRITE FOR THE PERSON READING IT
 
-Plain English. Short sentences. Common words. One idea per paragraph. A client is skimming fifteen proposals on a phone, and dense prose loses to clear prose every time. Write "I built" not "I have architected". Write "this breaks when" not "this presents challenges around".
+Work out who reads this before you write a word. A growth operator hiring a builder is not a CTO. A founder is not an engineering manager. The posting tells you: the words they use, what they brag about, what they ask you to send.
+
+Then pitch the vocabulary there. Keep the technical depth — it is the evidence — but say it in words the reader can price. An operator who runs funnels does not know what a JWT is and will not look it up.
+
+Translate, do not simplify away:
+→ "fail-closed trigger polling so a lost cursor cannot drop triggers" becomes "if the connection drops it stops instead of quietly missing events"
+→ "at-least-once delivery that survives a worker restart" becomes "if the server restarts mid-send, nothing is lost"
+→ "an SSO bridge from a Supabase JWT" becomes "users land already logged in, with no second account"
+
+Never stack four technical clauses into one sentence. One idea per sentence, one point per paragraph.
+
+SAY WHAT IT PRODUCED, NOT JUST WHAT IT WAS
+
+Every piece of evidence should land as a result. "320 test suites" is a fact; "320 test suites, so I ship on a Friday without worrying" is a result. "3.9M messages" is a number; "3.9M messages for paying customers, and I am the one who gets paged" is a result.
+
+If the client cares about speed, say how fast. If they care about revenue, say what it earned or saved. If they care about reliability, say what stopped breaking. Read the posting for which of those they actually want.
+
+Plain English throughout. Short sentences. Common words. Write "I built" not "I have architected". Write "this breaks when" not "this presents challenges around".
 
 No boilerplate. No "I am the perfect fit". No flattery. No restating the job back at them.
 
 Use short ALL-CAPS section headers when the letter has three or more distinct parts. Use → for bullets.
 
-Hard limit: 5000 characters. Aim for 2500–4000. Shorter is usually stronger.
+Hard limit: 5000 characters, enforced — a letter over it is rejected and never sent. Target 3000-4000 and treat 4500 as the ceiling you plan against, because you cannot count your own output precisely and a near-miss loses the whole draft. Shorter is usually stronger anyway.
 
 EVIDENCE — THE RULE THAT MATTERS MOST
 
