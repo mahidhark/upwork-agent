@@ -109,4 +109,10 @@ Revoke access any time from Upwork → Settings → Connected Apps.
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+[Sustainable Use License](LICENSE) — the same licence n8n uses.
+
+**Free forever if you are running it for yourself.** Self-host it, modify it, use it for your own freelancing or inside your own company. No fee, no seat count, no limits.
+
+The one thing it does not permit is selling it as a hosted service to other people. That keeps a future team or agency edition viable without ever charging an individual freelancer for the thing they can run themselves.
+
+This makes the project *fair-code* rather than OSI open source, which is a deliberate trade and the same one n8n made.
