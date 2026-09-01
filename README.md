@@ -14,28 +14,38 @@ So the scraping layer — the part that carries account-ban risk under Upwork's 
 
 These are deliberate and non-negotiable in this codebase.
 
-1. **A human confirms every submission.** Upwork's MCP gates each write behind a draft-confirm step, and its Terms of Use prohibit tools that submit without a person in the loop. The confirm gate stays on. This repo will not ship an auto-fire mode.
+1. **Submission is automated, and that is a deliberate choice with a cost.** Upwork's MCP splits every write into `create` then `confirm_draft`, and its Terms of Use expect a person in the loop. The split is real, but it is not a lock — both calls belong to the agent. This repo runs the pipeline end to end. If you run it, you are taking that position on your own account, and an account without an established reputation has the least room to absorb a warning. See [docs/requirements.md](docs/requirements.md) before enabling it.
 2. **Connects are real money.** Every submitted proposal spends them. The scoring stage is a cost control, not just a quality filter.
-3. **Eligibility filters are checked first.** Client-side gates — minimum earnings, Job Success Score, location — disqualify a bid before a single token is spent on drafting. Screening these last wastes the most expensive step.
+3. **Eligibility filters are checked first.** Client-side gates — minimum earnings, Job Success Score, location — disqualify a bid before a single token is spent on drafting. Screening these last wastes the most expensive step. Only part of this can live in the search query: a client's *preferred qualifications* are visible solely on a per-job fetch, so screening costs one extra call per candidate and is worth it.
 4. **No personal data in this repo.** Proposals, rates, client notes and profile material stay local and gitignored.
 
 ## Pipeline
 
 ```
-ingest      MCP job search + profile-based recommendations
+ingest      MCP job search, narrowed in-query: pool size, client hire
+            history, verified payment, budget, recency
    ↓
-screen      hard eligibility gates (earnings / JSS / location floors)
+screen      one fetch per candidate — preferred qualifications, client
+            hiring record, engagement signals, connects cost
    ↓
-score       fit rubric, tuned against real accept-reject history
+score       fit rubric weighted by competitive density: how big the
+            applicant pool is, how engaged the client is, and how the
+            field compares to the account
    ↓
-draft       proposal grounded in a corpus of previously won bids
+draft       proposal grounded in the profile, portfolio and prior letters
    ↓
 confirm     human reviews and submits  ← always
 ```
 
+The scoring stage leans on a per-proposal `insights` block the API returns for
+every proposal already submitted: applicant pool size, how many the client
+opened, shortlisted and messaged, and the average score, earnings and tenure of
+the competing applicants. That makes targeting measurable from the first batch,
+without waiting on a win history to train against.
+
 ## Status
 
-Early. The MCP connection is in place and the tool surface is being mapped; pipeline stages land after that.
+Early. The MCP connection is live and [the tool surface is mapped](docs/mcp-tool-surface.md). Pipeline stages land next, starting with ingest and screening.
 
 ## Setup
 
