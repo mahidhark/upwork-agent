@@ -1,0 +1,28 @@
+{
+  "name": "upwork-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Automated job ingest, screening and proposal drafting on the official Upwork MCP server",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "auth": "tsx src/auth/server.ts",
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "spike": "tsx spike/mcp-auth.ts",
+    "poll": "tsx src/ingest/poll.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "better-sqlite3": "^13.0.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.4.0",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  }
+}
