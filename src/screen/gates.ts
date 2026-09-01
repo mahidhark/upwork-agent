@@ -80,6 +80,10 @@ export interface ScreenConfig {
   minHourlyRate: number;
   /** Hours logged on Upwork. Zero while the account is fixed-price only. */
   hoursWorked: number;
+  /** FR-9: submissions allowed in a rolling 24 hours. */
+  maxPerDay?: number;
+  /** Ceiling on a boost bid, whatever the server recommends. */
+  maxBoostConnects?: number;
 }
 
 export const DEFAULT_SCREEN_CONFIG: ScreenConfig = {
