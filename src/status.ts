@@ -57,6 +57,34 @@ if (ages.length === 0) {
   console.log();
 }
 
+// Distinguishes a quiet market from an index that lags. If stale rejections
+// bunch up just past the window, the window is the problem, not the market.
+const stale = q<{ reject_reason: string }>(
+  "SELECT reject_reason FROM jobs WHERE reject_reason LIKE 'stale on arrival:%'",
+)
+  .map((r) => Number(/([\d.]+) min/.exec(r.reject_reason)?.[1]))
+  .filter((n) => Number.isFinite(n))
+  .sort((a, b) => a - b);
+
+if (stale.length) {
+  const window = config.screen.maxAgeMinutes;
+  const justMissed = stale.filter((m) => m <= window * 2.5).length;
+  console.log(`  TOO OLD WHEN SEEN  (n=${stale.length}, window is ${window} min)`);
+  const buckets: Array<[string, number]> = [
+    [`${window}-${window * 2} min`, stale.filter((m) => m <= window * 2).length],
+    [`${window * 2}-${window * 5} min`, stale.filter((m) => m > window * 2 && m <= window * 5).length],
+    [`over ${window * 5} min`, stale.filter((m) => m > window * 5).length],
+  ];
+  for (const [label, n] of buckets) {
+    console.log(`    ${label.padEnd(16)} ${String(n).padStart(4)}  ${'█'.repeat(Math.round((n / stale.length) * 26))}`);
+  }
+  if (justMissed / stale.length > 0.4) {
+    console.log(`\n    Most rejections land just past the window. That points at`);
+    console.log(`    search-index lag rather than a quiet market — widen maxAgeMinutes.`);
+  }
+  console.log();
+}
+
 const pending = q<{ title: string; score: number; proposal_count: number; created_date: string }>(
   `SELECT title, score, proposal_count, created_date FROM jobs
    WHERE state = 'scored' ORDER BY score DESC LIMIT 8`,
