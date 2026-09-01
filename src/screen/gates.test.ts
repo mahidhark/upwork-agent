@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { screen, passed, failures, DEFAULT_SCREEN_CONFIG, type JobDetail } from './gates.js';
 
 const NOW = new Date('2026-09-01T12:00:00Z');
+const SKILLS = ['n8n', 'make.com', 'whatsapp', 'webhook', 'automation', 'postgres', 'claude'];
 
 const base: JobDetail = {
   id: 'x',
@@ -13,6 +14,7 @@ const base: JobDetail = {
   hourlyMax: null,
   proposalCountInferred: false,
   screeningQuestions: [],
+  skillTags: [],
   budget: 600,
   createdDate: '2026-09-01T11:40:00Z',
   proposalCount: 5,
@@ -24,7 +26,7 @@ const base: JobDetail = {
 };
 
 const gate = (job: JobDetail, name: string, balance = 181) =>
-  screen(job, balance, NOW).find((g) => g.gate === name)!;
+  screen(job, balance, NOW, { ...DEFAULT_SCREEN_CONFIG, skills: SKILLS }).find((g) => g.gate === name)!;
 
 test('a clean, fresh, eligible job passes every gate', () => {
   assert.ok(passed(screen(base, 181, NOW)), JSON.stringify(failures(screen(base, 181, NOW))));
@@ -238,4 +240,61 @@ test('an inferred-zero pool on a fresh posting passes, and says so', () => {
 test('a genuinely unknown pool is rejected, never passed', () => {
   const job: JobDetail = { ...base, proposalCount: null, proposalCountInferred: false };
   assert.equal(gate(job, 'pool_small').passed, false);
+});
+
+test('a posting matching nothing in the skill list is rejected', () => {
+  // The real one that surfaced this: "Full-Time Sales Representative" cleared
+  // every other gate and scored 76.8, the highest of the day, on an empty pool
+  // and a paying client alone.
+  const job: JobDetail = {
+    ...base,
+    title: 'Full-Time Sales Representative',
+    skillTags: ['B2B Marketing', 'High-Ticket Closing', 'Sales', 'Outbound Sales'],
+    description: 'A self-driven salesperson who generates their own pipeline.',
+  };
+  const outcome = gate(job, 'relevant');
+  assert.equal(outcome.passed, false, outcome.detail);
+  assert.match(outcome.detail, /match nothing we do/);
+});
+
+test('an incidental tool mention deep in the prose does not make a job relevant', () => {
+  // The same sales posting mentions GoHighLevel once, in passing. That was
+  // enough to pass a description-wide match, which is why the gate reads the
+  // title and Upwork's own tags instead.
+  const job: JobDetail = {
+    ...base,
+    title: 'Full-Time Sales Representative',
+    skillTags: ['Sales', 'Outbound Sales'],
+    description: 'Cold calling and closing. Our pipeline lives in GoHighLevel and some automation exists.',
+  };
+  assert.equal(gate(job, 'relevant').passed, false);
+});
+
+test('a skill tag alone is enough, even when the title is vague', () => {
+  const job: JobDetail = {
+    ...base,
+    title: 'Developer needed',
+    skillTags: ['Make.com', 'API Integration'],
+    description: 'Some work.',
+  };
+  assert.equal(gate(job, 'relevant').passed, true);
+});
+
+test('a posting naming known tools is relevant, and says which', () => {
+  const job: JobDetail = {
+    ...base,
+    title: 'n8n automation engineer',
+    skillTags: ['Automation'],
+    description: 'Wire a webhook into Postgres via Make.com.',
+  };
+  const outcome = gate(job, 'relevant');
+  assert.equal(outcome.passed, true);
+  assert.match(outcome.detail, /n8n/);
+});
+
+test('relevance is skipped when no skill list is configured', () => {
+  // An operator who has not filled in their skills should not have every
+  // posting rejected.
+  const outcomes = screen(base, 181, NOW, { ...DEFAULT_SCREEN_CONFIG, skills: [] });
+  assert.equal(outcomes.find((o) => o.gate === 'relevant'), undefined);
 });

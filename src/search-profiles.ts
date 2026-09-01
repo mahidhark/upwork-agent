@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 import type { SearchParams } from './mcp/upwork.js';
 import type { ScreenConfig } from './screen/gates.js';
 import type { ScoreConfig } from './score/score.js';
+import type { BidConfig } from './submit/bid.js';
 
 export interface SearchProfile extends SearchParams {
   name: string;
@@ -20,6 +21,9 @@ export interface AgentConfig {
   screen: ScreenConfig;
   score: ScoreConfig;
   alerts: { connectsFloor: number; balanceCheckMinutes: number };
+  bid: BidConfig;
+  /** enabled: draft automatically. live: actually submit, rather than dry run. */
+  autoApply: { enabled: boolean; live: boolean };
   profiles: SearchProfile[];
 }
 
@@ -36,6 +40,8 @@ export function loadConfig(path = process.env.UPWORK_AGENT_CONFIG ?? DEFAULT_PAT
   if (!config.profiles?.length) throw new Error('no search profiles configured');
   if (!config.score) throw new Error('no score configuration');
   if (!config.alerts) throw new Error('no alerts configuration');
+  if (!config.bid) throw new Error('no bid configuration');
+  if (!config.autoApply) throw new Error('no autoApply configuration');
   for (const p of config.profiles) {
     if (p.budget_min != null && p.budget_max != null && p.budget_min > p.budget_max) {
       throw new Error(`profile ${p.name}: budget_min exceeds budget_max`);

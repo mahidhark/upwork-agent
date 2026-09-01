@@ -19,6 +19,7 @@ const job = (over: Partial<JobDetail> = {}): JobDetail => ({
   hourlyMax: null,
   proposalCountInferred: false,
   screeningQuestions: [],
+  skillTags: [],
   budget: 300,
   createdDate: '2026-09-01T11:50:00Z',
   proposalCount: 5,

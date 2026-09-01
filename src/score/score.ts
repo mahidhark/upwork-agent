@@ -91,10 +91,15 @@ function budgetFit(budget: number | null, band: { min: number; max: number }): n
  * "Zoho Team Inbox Expert — Zoho Mail Migration, 98 Templates" carried 8 at
  * eleven hours old.
  */
+export function matchSkills(title: string, description: string, skills: string[]): string[] {
+  if (skills.length === 0) return [];
+  const haystack = `${title}\n${description}`.toLowerCase();
+  return skills.filter((s) => haystack.includes(s.toLowerCase()));
+}
+
 function specificity(job: JobDetail, skills: string[]): { value: number; matched: string[] } {
   if (skills.length === 0) return { value: 0, matched: [] };
-  const haystack = `${job.title}\n${job.description}`.toLowerCase();
-  const matched = skills.filter((s) => haystack.includes(s.toLowerCase()));
+  const matched = matchSkills(job.title, job.description, skills);
   // Three distinct matches is a strong signal; more adds little.
   return { value: clamp01(matched.length / 3), matched };
 }
