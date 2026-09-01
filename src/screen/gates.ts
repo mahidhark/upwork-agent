@@ -40,6 +40,14 @@ export interface JobDetail {
   /** Client's stated hourly range, from hourlyContractTerms. */
   hourlyMin: number | null;
   hourlyMax: number | null;
+  /**
+   * True when proposalCount was inferred rather than reported. Upwork omits
+   * proposal_count from search results when it is zero, so an absent field on
+   * a posting minutes old means an empty pool — the best signal available, not
+   * a missing one. Never inferred for an older posting, where absence is
+   * genuinely unknown.
+   */
+  proposalCountInferred: boolean;
   createdDate: string;
   proposalCount: number | null;
   canApply: boolean;
@@ -200,8 +208,16 @@ export function screen(
   add('paid_in_cash', !noCash, noCash ? `matches ${noCash.source}` : 'cash contract');
 
   // --- pool size and freshness.
-  const pool = job.proposalCount ?? 0;
-  add('pool_small', pool <= config.maxProposals, `${pool} proposals`);
+  const pool = job.proposalCount;
+  add(
+    'pool_small',
+    pool !== null && pool <= config.maxProposals,
+    pool === null
+      ? 'proposal count unknown on a posting past the freshness window'
+      : job.proposalCountInferred
+        ? 'no proposals yet (count omitted on a fresh posting)'
+        : `${pool} proposals`,
+  );
 
   const ageMinutes = (now.getTime() - new Date(job.createdDate).getTime()) / 60000;
   add(

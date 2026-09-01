@@ -11,6 +11,7 @@ const base: JobDetail = {
   jobType: 'fixed',
   hourlyMin: null,
   hourlyMax: null,
+  proposalCountInferred: false,
   budget: 600,
   createdDate: '2026-09-01T11:40:00Z',
   proposalCount: 5,
@@ -221,4 +222,19 @@ test('all four qualification floors are reported together', () => {
   for (const expected of ['JSS 90', 'earnings', '100h', 'Rising Talent']) {
     assert.ok(detail.includes(expected), `missing ${expected} in: ${detail}`);
   }
+});
+
+test('an inferred-zero pool on a fresh posting passes, and says so', () => {
+  // Upwork omits proposal_count when it is zero. All three postings that
+  // cleared every gate on the first live run were 2-4 minutes old with the
+  // field absent.
+  const job: JobDetail = { ...base, proposalCount: 0, proposalCountInferred: true };
+  const outcome = gate(job, 'pool_small');
+  assert.equal(outcome.passed, true);
+  assert.match(outcome.detail, /no proposals yet/);
+});
+
+test('a genuinely unknown pool is rejected, never passed', () => {
+  const job: JobDetail = { ...base, proposalCount: null, proposalCountInferred: false };
+  assert.equal(gate(job, 'pool_small').passed, false);
 });
