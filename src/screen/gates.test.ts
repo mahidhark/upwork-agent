@@ -298,3 +298,25 @@ test('relevance is skipped when no skill list is configured', () => {
   const outcomes = screen(base, 181, NOW, { ...DEFAULT_SCREEN_CONFIG, skills: [] });
   assert.equal(outcomes.find((o) => o.gate === 'relevant'), undefined);
 });
+
+test('a fixed-price posting below the budget floor is rejected', () => {
+  // The real posting that exposed the hole: "GoHighLevel Webinar Registration
+  // Form Setup", $10 fixed, scored 76.2 and built a draft that would have
+  // spent 8 Connects to bid $9.
+  const job: JobDetail = { ...base, jobType: 'fixed', budget: 10 };
+  assert.equal(gate(job, 'rate_acceptable').passed, false);
+});
+
+test('a vague description cannot buy a tiny budget past the floor', () => {
+  // The scope gate is a ratio, so a posting with no countable deliverables
+  // scores zero and passes it at any budget. The floor must not depend on
+  // the description at all.
+  const job: JobDetail = { ...base, jobType: 'fixed', budget: 10, description: 'Need help.' };
+  assert.equal(gate(job, 'scope_fits_budget').passed, true);
+  assert.equal(gate(job, 'rate_acceptable').passed, false);
+});
+
+test('a fixed-price posting at or above the budget floor passes', () => {
+  const job: JobDetail = { ...base, jobType: 'fixed', budget: DEFAULT_SCREEN_CONFIG.minFixedBudget };
+  assert.equal(gate(job, 'rate_acceptable').passed, true);
+});
