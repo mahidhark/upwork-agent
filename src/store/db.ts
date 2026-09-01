@@ -181,6 +181,11 @@ export function setState(id: string, state: JobState, rejectReason?: string): vo
   );
 }
 
+/** The resolved count, once screening has decided between reported and inferred. */
+export function setProposalCount(id: string, count: number | null): void {
+  db.prepare('UPDATE jobs SET proposal_count = ? WHERE id = ?').run(count, id);
+}
+
 export function setScore(id: string, score: number): void {
   db.prepare('UPDATE jobs SET score = ? WHERE id = ?').run(score, id);
 }

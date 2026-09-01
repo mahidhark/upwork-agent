@@ -17,6 +17,7 @@ const job = (over: Partial<JobDetail> = {}): JobDetail => ({
   jobType: 'fixed',
   hourlyMin: null,
   hourlyMax: null,
+  proposalCountInferred: false,
   budget: 300,
   createdDate: '2026-09-01T11:50:00Z',
   proposalCount: 5,

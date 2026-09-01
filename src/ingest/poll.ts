@@ -23,6 +23,7 @@ import {
   recordGate,
   setState,
   setScore,
+  setProposalCount,
   isEmpty,
   startRun,
   finishRun,
@@ -176,11 +177,24 @@ export async function pollOnce(
       const detail = await getJob(client, orgUid, hit.id);
       // get carries neither the posting date nor the pool size; search does.
       detail.createdDate = hit.created_date;
-      detail.proposalCount = hit.proposal_count ?? null;
+
+      // Upwork omits proposal_count from search when it is zero. On a posting
+      // only minutes old that absence is the strongest signal we get — an
+      // empty pool — so infer zero rather than scoring it as unknown-worst.
+      // Beyond the freshness window the same absence is genuinely unknown.
+      if (hit.proposal_count != null) {
+        detail.proposalCount = hit.proposal_count;
+      } else if (ageMinutes(hit.created_date, now) <= config.screen.maxAgeMinutes) {
+        detail.proposalCount = 0;
+        detail.proposalCountInferred = true;
+      } else {
+        detail.proposalCount = null;
+      }
       if (!detail.jobType && hit.job_type) {
         detail.jobType = hit.job_type === 'hourly' ? 'hourly' : 'fixed';
       }
 
+      setProposalCount(hit.id, detail.proposalCount);
       const outcomes = screen(detail, balance, now, config.screen);
       for (const o of outcomes) recordGate(hit.id, o.gate, o.passed, o.detail);
       summary.screened++;
