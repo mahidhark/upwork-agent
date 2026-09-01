@@ -199,6 +199,10 @@ export function recordGate(jobId: string, gate: string, passed: boolean, detail?
   ).run(jobId, gate, passed ? 1 : 0, detail ?? null, new Date().toISOString());
 }
 
+export function getJobRow(id: string): JobRow | undefined {
+  return db.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as JobRow | undefined;
+}
+
 export function jobsInState(state: JobState): JobRow[] {
   return db
     .prepare('SELECT * FROM jobs WHERE state = ? ORDER BY created_date DESC')
@@ -218,6 +222,48 @@ export function submittedSince(isoTimestamp: string): number {
     )
     .get(isoTimestamp) as { n: number };
   return row.n;
+}
+
+export interface ProposalRecord {
+  jobId: string;
+  draftId: string | null;
+  proposalId: string | null;
+  coverLetter: string;
+  bid: number;
+  connectsCost: number | null;
+  boost: number;
+  chunks: string[];
+  dryRun: boolean;
+}
+
+/**
+ * FR-18. With no human reading the output before it goes, this record is the
+ * only way a bad run is ever diagnosed. Written whether or not it was sent.
+ */
+export function recordProposal(r: ProposalRecord): void {
+  db.prepare(
+    `INSERT INTO proposals (job_id, proposal_id, draft_id, cover_letter, bid,
+                            connects_cost, boost, chunks, submitted_at, dry_run)
+     VALUES (@jobId, @proposalId, @draftId, @coverLetter, @bid,
+             @connectsCost, @boost, @chunks, @submittedAt, @dryRun)
+     ON CONFLICT(job_id) DO UPDATE SET
+       proposal_id = excluded.proposal_id, draft_id = excluded.draft_id,
+       cover_letter = excluded.cover_letter, bid = excluded.bid,
+       connects_cost = excluded.connects_cost, boost = excluded.boost,
+       chunks = excluded.chunks, submitted_at = excluded.submitted_at,
+       dry_run = excluded.dry_run`,
+  ).run({
+    jobId: r.jobId,
+    proposalId: r.proposalId,
+    draftId: r.draftId,
+    coverLetter: r.coverLetter,
+    bid: r.bid,
+    connectsCost: r.connectsCost,
+    boost: r.boost,
+    chunks: JSON.stringify(r.chunks),
+    submittedAt: r.proposalId ? new Date().toISOString() : null,
+    dryRun: r.dryRun ? 1 : 0,
+  });
 }
 
 export function startRun(profile: string): number {

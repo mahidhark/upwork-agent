@@ -152,3 +152,100 @@ export async function firstOrgUid(client: Client): Promise<string> {
   if (!uid) throw new Error('no Upwork account returned by list_accounts');
   return uid;
 }
+
+// ------------------------------------------------------------ the write path
+
+export interface PreflightResult {
+  clear: boolean;
+  reason?: string;
+}
+
+/**
+ * FR-10, mandatory before any create. Upwork rejects a create with VJ-JA-10 if
+ * an invitation or prior proposal already exists for the job, which wastes the
+ * turn — and an invitation needs accept_invitation rather than create anyway.
+ */
+export async function preflight(
+  client: Client,
+  orgUid: string,
+  jobId: string,
+): Promise<PreflightResult> {
+  const invitations = toolJson<{ data?: { invitations?: Array<{ jobPosting?: { id?: string } }> } }>(
+    await client.callTool({
+      name: 'upwork__list_freelancer_proposals',
+      arguments: { action: 'invitations', org_uid: orgUid, params: { status: 'pending', limit: 10 } },
+    }),
+  );
+  for (const inv of invitations.data?.invitations ?? []) {
+    if (inv.jobPosting?.id === jobId) {
+      return { clear: false, reason: 'an invitation exists — use accept_invitation, not create' };
+    }
+  }
+
+  const proposals = toolJson<{
+    data?: { vendorProposals?: { edges?: Array<{ node?: { marketplaceJobPosting?: { id?: string } } }> } };
+  }>(
+    await client.callTool({
+      name: 'upwork__list_freelancer_proposals',
+      arguments: { action: 'list', org_uid: orgUid, params: { limit: 10 } },
+    }),
+  );
+  for (const edge of proposals.data?.vendorProposals?.edges ?? []) {
+    if (edge.node?.marketplaceJobPosting?.id === jobId) {
+      return { clear: false, reason: 'a proposal for this job already exists' };
+    }
+  }
+
+  return { clear: true };
+}
+
+export interface CreatePreview {
+  draft_id: string;
+  connects_cost?: number;
+  connects_balance?: number;
+  can_apply?: boolean;
+  boost?: import('../submit/boost.js').BoostBlock;
+  unmet_preferred_qualifications?: unknown;
+}
+
+/** Stages the proposal server-side. Spends nothing — only confirm does. */
+export async function createProposal(
+  client: Client,
+  orgUid: string,
+  params: {
+    job_reference: string;
+    cover_letter: string;
+    charged_amount: number;
+    boost_connects?: number;
+    answers?: Array<{ question: string; answer: string }>;
+  },
+): Promise<CreatePreview> {
+  const raw = toolJson<{ draft_id?: string; preview?: Record<string, unknown> }>(
+    await client.callTool({
+      name: 'upwork__manage_proposals',
+      arguments: { action: 'create', org_uid: orgUid, params },
+    }),
+  );
+  if (!raw.draft_id) throw new Error('create returned no draft_id');
+  return { draft_id: raw.draft_id, ...(raw.preview as object) } as CreatePreview;
+}
+
+/** The only call that spends Connects. */
+export async function confirmProposal(
+  client: Client,
+  orgUid: string,
+  draftId: string,
+): Promise<string> {
+  const raw = toolJson<{
+    data?: { createJobProposal?: { newProposalId?: string; status?: string } };
+    status?: string;
+  }>(
+    await client.callTool({
+      name: 'upwork__confirm_draft',
+      arguments: { action: 'confirm', org_uid: orgUid, params: { type: 'proposal', draft_id: draftId } },
+    }),
+  );
+  const id = raw.data?.createJobProposal?.newProposalId;
+  if (!id) throw new Error(`confirm did not return a proposal id (status: ${raw.status})`);
+  return id;
+}
