@@ -1,3 +1,5 @@
+import { matchSkills } from '../score/score.js';
+
 /**
  * Hard eligibility gates (requirements FR-6, FR-8, FR-13, risk 10.e).
  *
@@ -55,6 +57,8 @@ export interface JobDetail {
    * questions it does not have.
    */
   screeningQuestions: string[];
+  /** Upwork's own skill tags for the posting. Far more precise than prose. */
+  skillTags: string[];
   createdDate: string;
   proposalCount: number | null;
   canApply: boolean;
@@ -91,6 +95,10 @@ export interface ScreenConfig {
   maxPerDay?: number;
   /** Ceiling on a boost bid, whatever the server recommends. */
   maxBoostConnects?: number;
+  /** Tools and topics the operator can evidence. */
+  skills?: string[];
+  /** How many must appear before a posting counts as relevant at all. */
+  minSkillMatches?: number;
 }
 
 export const DEFAULT_SCREEN_CONFIG: ScreenConfig = {
@@ -217,6 +225,33 @@ export function screen(
   // --- no cash, no closed contract, no JSS.
   const noCash = NO_CASH.find((re) => re.test(job.description));
   add('paid_in_cash', !noCash, noCash ? `matches ${noCash.source}` : 'cash contract');
+
+  // --- relevance. A gate, not a weight.
+  //
+  // Every other gate asks whether a posting is winnable; none asked whether it
+  // is ours. A live "Full-Time Sales Representative" posting — cold calling,
+  // high-ticket closing — cleared all of them and scored 76.8, the highest of
+  // the day, on an empty pool and a paying client alone. Specificity is 15% of
+  // the score, so zero relevance still reaches the high seventies. Scoring
+  // ranks candidates; it cannot be what decides whether something is a
+  // candidate.
+  const skills = config.skills ?? [];
+  const required = config.minSkillMatches ?? 1;
+  if (skills.length > 0) {
+    // Match the TITLE and Upwork's own skill tags, never the description.
+    // Prose is recall, not precision: the sales posting that surfaced this
+    // mentioned GoHighLevel once in passing, which was enough to clear a
+    // description-wide match while its actual tags read B2B Marketing,
+    // High-Ticket Closing, Sales and Outbound Sales.
+    const hits = matchSkills(job.title, job.skillTags.join(' '), skills);
+    add(
+      'relevant',
+      hits.length >= required,
+      hits.length
+        ? `title/tags match ${hits.slice(0, 5).join(', ')}`
+        : `title and tags match nothing we do (tags: ${job.skillTags.slice(0, 5).join(', ') || 'none'})`,
+    );
+  }
 
   // --- pool size and freshness.
   const pool = job.proposalCount;

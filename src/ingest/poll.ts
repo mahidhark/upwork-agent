@@ -18,6 +18,7 @@ import { searchJobs, getJob, connectsBalance, firstOrgUid, type SearchHit } from
 import { screen, passed, failures } from '../screen/gates.js';
 import { scoreJob } from '../score/score.js';
 import { raise, authRevoked, connectsLow } from '../alert/index.js';
+import { applyToJob } from '../submit/run.js';
 import {
   recordSeen,
   recordGate,
@@ -36,6 +37,7 @@ export interface PollSummary {
   accepted: number;
   rejected: number;
   topScore: number;
+  submitted: number;
   bootstrapped: boolean;
 }
 
@@ -132,6 +134,7 @@ export async function pollOnce(
     accepted: 0,
     rejected: 0,
     topScore: 0,
+    submitted: 0,
     bootstrapped: bootstrapping,
   };
 
@@ -190,6 +193,7 @@ export async function pollOnce(
       } else {
         detail.proposalCount = null;
       }
+      detail.skillTags = hit.skills ?? [];
       if (!detail.jobType && hit.job_type) {
         detail.jobType = hit.job_type === 'hourly' ? 'hourly' : 'fixed';
       }
@@ -209,9 +213,32 @@ export async function pollOnce(
         summary.topScore = Math.max(summary.topScore, breakdown.total);
         console.log(
           `    ${breakdown.total.toFixed(1).padStart(5)}  ${hit.title.slice(0, 58)}` +
-            `  [${hit.proposal_count ?? '?'} props` +
+            `  [${detail.proposalCount ?? '?'} props` +
             `${breakdown.matchedSkills.length ? `, ${breakdown.matchedSkills.slice(0, 4).join('/')}` : ''}]`,
         );
+
+        // The last link. Without this the pipeline stops at "scored" and waits
+        // for a human to run apply by hand, which is the design that was
+        // explicitly rejected.
+        if (config.autoApply.enabled) {
+          try {
+            const result = await applyToJob(
+              client, orgUid, detail, balance, config,
+              { live: config.autoApply.live },
+              (line) => console.log(line),
+            );
+            if (result.outcome === 'submitted') {
+              summary.submitted++;
+              console.log(`    SUBMITTED ${result.proposalId} · $${result.bid} · ${result.connectsCost} connects`);
+            } else if (result.outcome === 'dry_run') {
+              console.log(`    DRY RUN · $${result.bid} · would cost ${result.connectsCost} connects`);
+            } else {
+              console.log(`    not applied — ${result.reason}`);
+            }
+          } catch (err) {
+            console.error(`    apply failed: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
       } else {
         setState(hit.id, 'rejected', failures(outcomes).map((f) => `${f.gate}: ${f.detail}`).join('; '));
         summary.rejected++;
@@ -255,7 +282,8 @@ export async function run(once: boolean): Promise<void> {
       const line = s.bootstrapped
         ? `bootstrap — ${s.seen} existing postings marked seen, none processed`
         : `${s.seen} seen · ${s.fresh} fresh · ${s.screened} screened · ${s.accepted} accepted · ${s.rejected} rejected` +
-          (s.accepted ? ` · top ${s.topScore.toFixed(1)}` : '');
+          (s.accepted ? ` · top ${s.topScore.toFixed(1)}` : '') +
+          (s.submitted ? ` · SUBMITTED ${s.submitted}` : '');
       console.log(`  ${new Date().toISOString()}  ${line}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
