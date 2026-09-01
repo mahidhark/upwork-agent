@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Automated job ingest, screening and proposal drafting on the official Upwork MCP server",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "engines": {
     "node": ">=22"
   },
