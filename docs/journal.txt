@@ -124,3 +124,83 @@ Files
   docs/journal.txt       this entry
 
 Tests: 80, unchanged. npm run typecheck clean.
+
+
+2026-09-02 — soak check, then Trust & Safety restriction; automation stopped
+-----------------------------------------------------------------------------
+Read-only soak of the first 20 hours unattended. Ended with the account
+restricted and both processes shut down. No code changed this session.
+
+The run itself was stable: 393 poll cycles at 20/hour from 09-01T14:00, zero
+restarts, one error (the 09-01 connectsBalance crash, self-recovered). 196 jobs
+seen, 72 screened, 3 submitted and confirmed live on Upwork. 36 connects spent,
+balance 130.
+
+Findings, in the order they matter:
+
+  1. The daily cap is first-come, not best-of. Three proposals landed inside 80
+     minutes (21:44, 22:56, 23:02 on 09-01) scoring 69.5, 65.4 and 72.8. In the
+     22 hours after, six jobs cleared every gate and were refused with "3
+     proposals in 24h" — scoring 76.0, 76.4, 81.8, 85.0, 91.4, 91.8. Every
+     refused job outranked every submitted one. They sit in `scored`, which
+     nothing sweeps; 12 jobs are stranded there.
+
+  2. The drafter names a disqualifier and submits anyway. Both auto-submissions
+     went to the same client (8658048), two near-duplicate $50 postings six
+     minutes apart, 16 connects. The letters say "I don't operate a marketing or
+     lead gen agency" in their own WHERE I DON'T MATCH block. Nothing gates on
+     that, and there is no per-client dedupe.
+
+  3. isAuthError misses the real message. poll.ts:47 matches "token expired" and
+     "token has expired" but not "token is expired", which is what Upwork sends.
+     When authorization was revoked at 10:47 the guard did not fire, no alert
+     was raised, and the poller treated a permanent failure as transient and
+     backed off. The alerts table has never had a row; the email channel is
+     still unproven in production.
+
+  4. Search coverage, traced from one missed posting. A Forward Deployed
+     Engineer role (client $249k spend, 4.99/21, $20-40/hr, TypeScript/Claude/
+     MCP) never reached the database. Cause is query shape, not gates: adding
+     one word the posting lacks evicts it. "Forward Deployed Engineer" ranks it
+     first; + "automation" or + "webhook" loses it entirely. The word
+     "automation" appears nowhere in that posting, and neither does "webhook" —
+     so api-integration and ai-agents, the two profiles built to catch it, each
+     miss on their own third word. find_jobs action=smart_search returns it at
+     rank 3. The dashboard's matching_jobs feed is a third surface we never read.
+
+  5. Detection latency is bimodal, not a flat 34 min median. Split by whether
+     Upwork published a proposal count: omitted (fresh postings) n=104, median
+     3.9 min; reported (aged postings) n=96, median 2135 min. The 3-minute loop
+     is fast when the surface cooperates. Note our own pool data is censored
+     twice — proposals_max 15 hides the tail, and 69 of the recorded zeros are
+     inferred rather than observed.
+
+At 10:47:44 UTC the poller failed with "Refresh token is expired or revoked or
+not registered". That was not an expiry. Upwork Trust & Safety restricted the
+account for automated activity; their ticket is timestamped 12:47 CEST, the same
+minute. Detection was, by their own notice, fully automated with no human review.
+
+Stopped at 10:50 UTC: touch ~/.upwork-agent/STOP, pm2 stop on both processes,
+pm2 save so a reboot cannot resurrect them. Nothing on this box has contacted
+Upwork since 10:47.
+
+An appeal was filed. Its position: access ran through Upwork's own official MCP
+server under OAuth Upwork issued, so the "without permission" qualifier in their
+notice does not apply; none of their enumerated categories (scraper, browser
+extension, refresh tool, third-party software) describe it; three proposals, all
+individually written, connects spent on each, no client messaged and no other
+user affected.
+
+Still open, unchanged:
+  - README.md says scoring, drafting and submission are "not built" and quotes
+    19 tests. All three are built and there are 80.
+  - Letter tone is still the register flagged on 09-01: ALL-CAPS headers,
+    contrarian cold open, arrow bullets. Both auto-sent letters have it.
+  - connectsBalance deref unguarded at poll.ts:111 and apply.ts:52.
+
+Files
+  (none in the repo — read-only session)
+  ~/.upwork-agent/STOP   created
+  /root/.pm2/dump.pm2    saved with both processes stopped
+
+Tests: 80, unchanged. npm run typecheck clean.
