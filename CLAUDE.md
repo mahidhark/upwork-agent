@@ -10,6 +10,7 @@ npm run auth                       # authorization UI on 127.0.0.1:3400, one bro
 npm run poll -- --once             # one ingest + screen pass, then exit
 npm run poll                       # the loop (this is what pm2 runs)
 npm run status                     # one-shot report: detection latency, states, rejection reasons
+npm run explain -- <job-id>        # why one posting was rejected, or never seen at all
 npm test                           # full suite
 npm run typecheck                  # tsc --noEmit
 npm run draft -- <job-id>          # draft one letter without submitting
