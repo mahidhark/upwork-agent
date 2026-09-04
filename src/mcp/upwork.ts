@@ -78,6 +78,7 @@ export async function getJob(client: Client, orgUid: string, id: string): Promis
     connects_balance?: number;
     client_record?: Record<string, unknown>;
     preferred_qualifications?: Record<string, unknown>;
+    preferred_locations?: { countries?: string[]; location_required?: boolean };
     screening_questions?: string[];
     data?: {
       marketplaceJobPosting?: {
@@ -120,6 +121,14 @@ export async function getJob(client: Client, orgUid: string, id: string): Promis
     proposalCountInferred: false,
     screeningQuestions: raw.screening_questions ?? [],
     skillTags: [],
+    // Structured location requirement. Present only when the client used
+    // Upwork's location filter; a requirement written into the description
+    // carries no such block, which is why gates.ts also reads the prose.
+    preferredCountries: raw.preferred_locations?.countries ?? [],
+    locationRequired: raw.preferred_locations?.location_required ?? false,
+    // Hourly postings only — it sits under hourlyContractTerms, so a
+    // fixed-price posting never carries one.
+    engagementType: hourly?.engagementType ?? null,
     // The search hit carries created_date; get does not, so the caller supplies it.
     createdDate: new Date().toISOString(),
     proposalCount: null,

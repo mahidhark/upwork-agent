@@ -59,6 +59,16 @@ export interface JobDetail {
   screeningQuestions: string[];
   /** Upwork's own skill tags for the posting. Far more precise than prose. */
   skillTags: string[];
+  /**
+   * Countries from Upwork's structured `preferred_locations` block. Emitted
+   * only when the client used the location filter — a requirement typed into
+   * the description carries none, so the prose fallback below still matters.
+   */
+  preferredCountries?: string[];
+  /** True when that block marks the country list as a bar rather than a preference. */
+  locationRequired?: boolean;
+  /** FULL_TIME / PART_TIME. Hourly postings only; fixed-price never carries one. */
+  engagementType?: string | null;
   createdDate: string;
   proposalCount: number | null;
   canApply: boolean;
@@ -101,6 +111,17 @@ export interface ScreenConfig {
   skills?: string[];
   /** How many must appear before a posting counts as relevant at all. */
   minSkillMatches?: number;
+  /**
+   * Where the operator actually is. Undefined disables the location gate
+   * entirely — poll.ts and run.ts pass `config.screen` straight through, so a
+   * key absent from JSON arrives here as undefined rather than as the default.
+   */
+  operatorCountry?: string;
+  /**
+   * Floor on a fixed-price posting's implied hourly rate, when the posting
+   * states both a duration and a weekly commitment. Undefined disables it.
+   */
+  minImpliedHourly?: number;
 }
 
 export const DEFAULT_SCREEN_CONFIG: ScreenConfig = {
@@ -157,11 +178,122 @@ const HEAVY_SCOPE = [
   /\bmilestone\s*[45-9]\b/i,
 ];
 
+/**
+ * A HEAVY_SCOPE phrase preceded by a negation means the opposite of scope.
+ *
+ * Found on a live $200 consultation posting that scored +4 here for "we are
+ * NOT starting from scratch" and "this is NOT a request to build the full
+ * system" — both of which are the client capping scope, not expanding it.
+ * Bounded to 40 characters and stopped at a sentence break so an unrelated
+ * "not" earlier in the paragraph cannot suppress a real hit.
+ */
+const NEGATED = /\b(?:not|never|n't|rather than|instead of)\b[^.]{0,40}$/i;
+
+function heavyScopeHits(description: string): number {
+  let hits = 0;
+  for (const re of HEAVY_SCOPE) {
+    const scan = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
+    let m: RegExpExecArray | null;
+    while ((m = scan.exec(description)) !== null) {
+      if (!NEGATED.test(description.slice(Math.max(0, m.index - 40), m.index))) {
+        hits++;
+        break;
+      }
+    }
+  }
+  return hits;
+}
+
 function countDeliverables(description: string): number {
   const milestones = description.match(/^\s*\d+[.)]\s+/gm)?.length ?? 0;
   const bullets = description.match(/^\s*[-•→*]\s+/gm)?.length ?? 0;
-  const heavy = HEAVY_SCOPE.reduce((n, re) => n + (re.test(description) ? 1 : 0), 0);
-  return milestones + bullets * 0.5 + heavy * 2;
+  return milestones + bullets * 0.5 + heavyScopeHits(description) * 2;
+}
+
+/**
+ * Countries the gate can recognise, with the aliases postings actually use.
+ *
+ * A closed list rather than a capture-anything pattern, because "AI-based" and
+ * "cloud-based" would otherwise read as country requirements. An unrecognised
+ * token means the gate cannot judge, and cannot judge means pass.
+ */
+const COUNTRIES: Record<string, string> = {
+  'united states': 'United States', usa: 'United States', us: 'United States',
+  'united kingdom': 'United Kingdom', uk: 'United Kingdom', britain: 'United Kingdom',
+  england: 'United Kingdom', scotland: 'United Kingdom',
+  netherlands: 'Netherlands', holland: 'Netherlands',
+  'united arab emirates': 'United Arab Emirates', uae: 'United Arab Emirates',
+  'new zealand': 'New Zealand', 'south africa': 'South Africa',
+  'czech republic': 'Czechia', czechia: 'Czechia',
+  singapore: 'Singapore', india: 'India', australia: 'Australia', canada: 'Canada',
+  ireland: 'Ireland', germany: 'Germany', france: 'France', spain: 'Spain', italy: 'Italy',
+  portugal: 'Portugal', poland: 'Poland', sweden: 'Sweden', norway: 'Norway',
+  denmark: 'Denmark', finland: 'Finland', belgium: 'Belgium', switzerland: 'Switzerland',
+  austria: 'Austria', greece: 'Greece', romania: 'Romania', serbia: 'Serbia',
+  ukraine: 'Ukraine', hungary: 'Hungary', turkey: 'Turkey', israel: 'Israel',
+  egypt: 'Egypt', nigeria: 'Nigeria', kenya: 'Kenya', brazil: 'Brazil', mexico: 'Mexico',
+  argentina: 'Argentina', japan: 'Japan', china: 'China', philippines: 'Philippines',
+  pakistan: 'Pakistan', bangladesh: 'Bangladesh', indonesia: 'Indonesia',
+  malaysia: 'Malaysia', vietnam: 'Vietnam', thailand: 'Thailand',
+};
+
+/** "the Netherlands" and "NETHERLANDS" are the same place. */
+const country = (raw: string): string | null =>
+  COUNTRIES[raw.trim().toLowerCase().replace(/^the\s+/, '')] ?? null;
+
+/**
+ * Prose that states a country as a BAR. Deliberately narrow.
+ *
+ * "We prefer candidates in X" and "overlap with X hours" must not match:
+ * instructions.ts already draws exactly this line for claim-injections ("a
+ * stated preference is NOT an instruction to claim residency"), and the two
+ * files must not disagree about what a preference is.
+ */
+const LOCATION_BAR = [
+  /\bmust\s+(?:be\s+)?(?:based|located|reside|residing)\s+in\s+((?:the\s+)?[A-Za-z]+(?:\s+[A-Za-z]+){0,2})/i,
+  /\byou\s+should:?\s*\n?\s*be\s+based\s+in\s+((?:the\s+)?[A-Za-z]+(?:\s+[A-Za-z]+){0,2})/i,
+  /\b([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,2})-based\b/,
+];
+
+/** The country a posting requires, or null when none is discoverable. */
+function requiredCountry(description: string): string | null {
+  for (const re of LOCATION_BAR) {
+    const m = description.match(re);
+    if (!m?.[1]) continue;
+    // Try the longest capture first, then shrink: "must be based in Singapore
+    // and have" should resolve to Singapore, not to the whole trailing phrase.
+    const words = m[1].trim().split(/\s+/);
+    for (let n = words.length; n > 0; n--) {
+      const hit = country(words.slice(0, n).join(' '));
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+/**
+ * Implied hourly rate on a fixed-price posting that states both a duration and
+ * a weekly commitment.
+ *
+ * $320 across "6 months" at "up to 2 hours per week" is about $6/hr, and both
+ * money gates wave it through today: minFixedBudget is absolute and cannot see
+ * duration, and a four-line posting yields no countable deliverables. Returns
+ * null unless BOTH numbers are present, so this never changes an existing
+ * verdict on a posting that does not state them.
+ */
+const MONTHS = /(\d+)\s*months?\b/i;
+const HOURS_PER_WEEK = /(?:up\s+to\s+)?(\d+)\s*(?:-\s*(\d+)\s*)?(?:hours?|hrs?)\s*(?:per|a|\/)\s*week/i;
+
+function impliedHourly(description: string, budget: number): number | null {
+  const m = description.match(MONTHS);
+  const h = description.match(HOURS_PER_WEEK);
+  if (!m || !h) return null;
+  const months = Number(m[1]);
+  // Upper bound of a range: more hours for the same money is the worse deal,
+  // and a false reject costs one posting where a false pass costs Connects.
+  const hours = Number(h[2] ?? h[1]);
+  if (!(months > 0) || !(hours > 0)) return null;
+  return budget / (months * 4.33 * hours);
 }
 
 export function screen(
@@ -256,6 +388,46 @@ export function screen(
     );
   }
 
+  // --- location. A bar the operator cannot clear, and nothing else could see it.
+  //
+  // Note this gate PASSES on a missing signal, which reads against this file's
+  // rule that a missing field is a rejection. The distinction is what absence
+  // means: an absent budget means the budget is unknown, while an absent
+  // location requirement means there is no requirement. Absence is informative
+  // here and uninformative there.
+  //
+  // Undefined operatorCountry disables it — poll.ts and run.ts pass
+  // `config.screen` through untouched, so an un-updated config lands here as
+  // undefined rather than as DEFAULT_SCREEN_CONFIG's value.
+  if (config.operatorCountry) {
+    const operator = country(config.operatorCountry) ?? config.operatorCountry;
+    const listed = (job.preferredCountries ?? []).map((c) => country(c) ?? c);
+
+    if (job.locationRequired && listed.length > 0) {
+      const ok = listed.some((c) => c.toLowerCase() === operator.toLowerCase());
+      add(
+        'location_eligible',
+        ok,
+        ok
+          ? `requires ${listed.join(', ')}, operator is in ${operator}`
+          : `requires ${listed.join(', ')} and the operator is in ${operator}`,
+      );
+    } else if (listed.length > 0) {
+      // The block exists but is marked a preference, not a bar.
+      add('location_eligible', true, `prefers ${listed.join(', ')}, not required`);
+    } else {
+      const stated = requiredCountry(job.description);
+      const ok = stated === null || stated.toLowerCase() === operator.toLowerCase();
+      add(
+        'location_eligible',
+        ok,
+        stated === null
+          ? 'no country requirement stated'
+          : `posting requires ${stated}, operator is in ${operator}`,
+      );
+    }
+  }
+
   // --- pool size and freshness.
   const pool = job.proposalCount;
   add(
@@ -326,12 +498,23 @@ export function screen(
     //
     // Hourly work has `minHourlyRate` for this. Fixed-price needs its own
     // absolute floor, judged on the budget alone and never on the description.
+    // The absolute floor cannot see duration: $320 clears $50 whether it buys
+    // two days or six months. When the posting states both a duration and a
+    // weekly commitment, price it.
+    const implied =
+      config.minImpliedHourly != null && budget > 0
+        ? impliedHourly(job.description, budget)
+        : null;
+    const budgetOk = budget >= config.minFixedBudget;
+    const effortOk = implied === null || implied >= config.minImpliedHourly!;
     add(
       'rate_acceptable',
-      budget >= config.minFixedBudget,
-      budget > 0
-        ? `fixed budget $${budget}, floor $${config.minFixedBudget}`
-        : 'no budget stated on a fixed-price posting',
+      budgetOk && effortOk,
+      budget <= 0
+        ? 'no budget stated on a fixed-price posting'
+        : implied !== null
+          ? `fixed budget $${budget} implies $${implied.toFixed(2)}/hr, floor $${config.minImpliedHourly}`
+          : `fixed budget $${budget}, floor $${config.minFixedBudget}`,
     );
   }
 

@@ -320,3 +320,144 @@ test('a fixed-price posting at or above the budget floor passes', () => {
   const job: JobDetail = { ...base, jobType: 'fixed', budget: DEFAULT_SCREEN_CONFIG.minFixedBudget };
   assert.equal(gate(job, 'rate_acceptable').passed, true);
 });
+
+// --------------------------------------------------------------- location
+//
+// A Singapore posting cleared every gate on 2026-09-04 and was unwinnable:
+// "Be based in Singapore" plus "[IMPORTANT] Existing Singapore client case
+// studies". 18 Connects. Nothing modelled location.
+
+const NL = { ...DEFAULT_SCREEN_CONFIG, skills: SKILLS, operatorCountry: 'Netherlands' };
+const at = (job: JobDetail, name: string, cfg = NL) =>
+  screen(job, 181, NOW, cfg).find((g) => g.gate === name)!;
+
+test('a structured country bar the operator cannot clear is rejected', () => {
+  const g = at({ ...base, preferredCountries: ['Singapore'], locationRequired: true }, 'location_eligible');
+  assert.equal(g.passed, false);
+  assert.match(g.detail, /Singapore/);
+});
+
+test('a structured country bar the operator does clear passes', () => {
+  const g = at({ ...base, preferredCountries: ['Netherlands'], locationRequired: true }, 'location_eligible');
+  assert.equal(g.passed, true);
+});
+
+test('a country list marked not-required is a preference, not a bar', () => {
+  const g = at({ ...base, preferredCountries: ['Singapore'], locationRequired: false }, 'location_eligible');
+  assert.equal(g.passed, true);
+  assert.match(g.detail, /not required/);
+});
+
+test('a prose country bar is caught when no structured block exists', () => {
+  const g = at({ ...base, description: 'You should:\nBe based in Singapore\nHave strong experience' }, 'location_eligible');
+  assert.equal(g.passed, false);
+  assert.match(g.detail, /Singapore/);
+});
+
+test('"Singapore-based expert" in the opening line is a bar', () => {
+  const g = at({ ...base, description: 'We are looking for a Singapore-based automation expert.' }, 'location_eligible');
+  assert.equal(g.passed, false);
+});
+
+test('a stated preference is not a bar — instructions.ts draws the same line', () => {
+  const g = at({ ...base, description: 'We prefer candidates in Malaysia but are open to anyone.' }, 'location_eligible');
+  assert.equal(g.passed, true);
+});
+
+test('"AI-based" is not a country', () => {
+  const g = at({ ...base, description: 'Build an AI-based tool. Cloud-based deployment.' }, 'location_eligible');
+  assert.equal(g.passed, true);
+});
+
+test('the operator country resolves through aliases', () => {
+  const g = at({ ...base, description: 'You must be based in the Netherlands.' }, 'location_eligible');
+  assert.equal(g.passed, true);
+});
+
+test('the location gate is absent entirely when no operator country is configured', () => {
+  const outcomes = screen({ ...base, description: 'Must be based in Singapore.' }, 181, NOW, {
+    ...DEFAULT_SCREEN_CONFIG, skills: SKILLS,
+  });
+  assert.equal(outcomes.find((g) => g.gate === 'location_eligible'), undefined);
+});
+
+// ------------------------------------------------- fixed-price effort floor
+//
+// $320 fixed for "6 months" at "up to 2 hours per week" is about $6/hr, and
+// cleared both money gates: minFixedBudget is absolute and cannot see
+// duration, and a four-line posting yields no countable deliverables.
+
+const EFFORT = { ...NL, minImpliedHourly: 15 };
+
+test('a fixed budget spread over months is priced by the hour', () => {
+  const g = at({
+    ...base, jobType: 'fixed', budget: 320,
+    description: 'Market research study. Duration: 6 months. Time Commitment: up to 2 hours per week.',
+  }, 'rate_acceptable', EFFORT);
+  assert.equal(g.passed, false);
+  assert.match(g.detail, /6\.1\d\/hr/);
+});
+
+test('the same budget over a short duration is fine', () => {
+  const g = at({
+    ...base, jobType: 'fixed', budget: 320,
+    description: 'Duration: 1 month. Time Commitment: up to 2 hours per week.',
+  }, 'rate_acceptable', EFFORT);
+  assert.equal(g.passed, true);
+});
+
+test('an hours range is judged on its upper bound, not its lower', () => {
+  // 5 hrs/week clears the floor at $320/month; 10 does not. Taking the lower
+  // bound would pass this, which is the lenient direction on a money gate.
+  const g = at({
+    ...base, jobType: 'fixed', budget: 320,
+    description: 'Duration: 1 month. Commitment: 5-10 hours per week.',
+  }, 'rate_acceptable', EFFORT);
+  assert.equal(g.passed, false);
+});
+
+test('a duration with no weekly commitment leaves the verdict unchanged', () => {
+  const g = at({
+    ...base, jobType: 'fixed', budget: 320, description: 'A 6 months engagement.',
+  }, 'rate_acceptable', EFFORT);
+  assert.equal(g.passed, true);
+  assert.match(g.detail, /floor \$50/);
+});
+
+test('the effort floor is silent when minImpliedHourly is not configured', () => {
+  const g = at({
+    ...base, jobType: 'fixed', budget: 320,
+    description: 'Duration: 6 months. Time Commitment: up to 2 hours per week.',
+  }, 'rate_acceptable', { ...NL, minImpliedHourly: undefined });
+  assert.equal(g.passed, true);
+});
+
+// ------------------------------------------------------- negation guard
+//
+// A $200 consultation scored +4 here for two phrases where the client was
+// capping scope, not expanding it.
+
+test('a negated heavy-scope phrase does not count as scope', () => {
+  const negated = at({
+    ...base, jobType: 'fixed', budget: 200,
+    description: 'We are not starting from scratch. This is not a request to build the full system.',
+  }, 'scope_fits_budget', EFFORT);
+  const asserted = at({
+    ...base, jobType: 'fixed', budget: 200,
+    description: 'We need this built from scratch. You will deliver the full system.',
+  }, 'scope_fits_budget', EFFORT);
+  assert.match(negated.detail, /~0\.0 deliverables/);
+  assert.match(asserted.detail, /~4\.0 deliverables/);
+});
+
+test('the negation guard alone does not rescue a long client brief', () => {
+  // Honest assertion: the guard removes 4 points from the AI Architecture
+  // posting, and its 10 numbered discussion questions still fail the ratio.
+  // countDeliverables cannot tell a long brief from a long deliverable list;
+  // see docs/screening-gaps-plan.md §5.
+  const g = at({
+    ...base, jobType: 'fixed', budget: 200,
+    description: 'We are not starting from scratch.\n1. First question\n2. Second\n3. Third\n4. Fourth\n5. Fifth',
+  }, 'scope_fits_budget', EFFORT);
+  assert.equal(g.passed, false);
+});

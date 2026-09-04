@@ -95,7 +95,9 @@
       "mvp",
       "minimum viable product"
     ],
-    "minSkillMatches": 1
+    "minSkillMatches": 1,
+    "operatorCountry": "Netherlands",
+    "minImpliedHourly": 15
   },
   "profiles": [
     {

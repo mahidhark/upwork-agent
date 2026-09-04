@@ -458,3 +458,74 @@ Files
   (outside the repo) corpus availability-and-positioning.md updated
 
 Tests: 80, unchanged. npm run typecheck clean.
+
+
+2026-09-04 (cont.) — closed the two screening gaps that lose money
+-------------------------------------------------------------------
+Plan and 10-dimension stress test in docs/screening-gaps-plan.md. 27 findings,
+11 actionable, all absorbed into the design before any code was written. Three
+changed the plan materially and are worth repeating here:
+
+  - 2.c: the plan assumed loadConfig() validates screen keys. It does not — it
+    checks profiles, score, alerts, bid, autoApply only (search-profiles.ts:40).
+    And poll.ts:202 / run.ts:71 pass `config.screen` straight through, so
+    DEFAULT_SCREEN_CONFIG is NOT a fallback on the live path. A key absent from
+    JSON arrives as undefined. Both new keys are therefore optional and both
+    checks no-op when unset rather than throwing or rejecting.
+  - 3.c: adding required fields to JobDetail would break the `base` fixture at
+    gates.test.ts:8 and every other literal. All three new fields are optional.
+  - 1.c/1.f: the first-draft prose pattern captured `([A-Z][a-z]+)`, which
+    reads "AI-based" as a country and truncates "United States" to "United".
+    Replaced with a closed country table: an unrecognised token means the gate
+    cannot judge, and cannot judge means pass.
+
+What changed:
+
+  src/mcp/upwork.ts — getJob now reads `preferred_locations` (countries,
+  location_required) and engagementType, all previously dropped. getJob runs on
+  all three screening paths, so no poll/apply merge change was needed, unlike
+  skillTags and proposalCount.
+
+  src/screen/gates.ts — new gate `location_eligible`, a fixed-price effort
+  floor folded into `rate_acceptable`, and a negation guard on HEAVY_SCOPE.
+
+Measured against the nine live postings that produced the gaps:
+
+  Singapore Second Brain   APPLY (all gates passed)  ->  REJECT
+                           location_eligible: requires Singapore, operator is
+                           in Netherlands. This is the 18-connect save.
+  Market Research NL       rate_acceptable passed    ->  REJECT
+                           fixed budget $320 implies $6.16/hr, floor $15
+  AI Architecture          22.5 deliverables         ->  18.5, still fails
+  GTM Engineer             APPLY                     ->  APPLY, no regression
+
+Two deliberate non-fixes, both recorded in the plan §5 rather than quietly
+skipped:
+
+  1. countDeliverables cannot tell a long client brief from a long deliverable
+     list. The negation guard takes the AI Architecture posting from 22.5 to
+     18.5 against a 1.5-per-$100 floor, so it still auto-rejects the best-fit
+     posting of the day. The remaining points are 10 numbered discussion
+     questions and ~30 bullets describing what the CLIENT is building. The only
+     real fix is to have something read the posting — extractInstructions
+     already does, but at draft time, after screening. Moving it earlier costs
+     a model call per candidate, which is a cost and architecture change and
+     therefore a §3 stop-and-ask. Mahi's call: accept it, narrow the gate to
+     fire only under a Scope/Deliverables heading, or pay for the call.
+  2. engagementType is plumbed but no gate reads it. Mahi is available full
+     time as of today, so a gate would only produce false rejects. Plumbing it
+     now makes a future gate one line.
+
+One [Mahi-verify] left open: operatorCountry is set to "Netherlands", matching
+the Upwork profile. Some postings say "EU-based" rather than naming a country;
+an EU pattern can be added later without changing the gate's shape.
+
+Files
+  src/mcp/upwork.ts              +3 fields read
+  src/screen/gates.ts            location gate, effort floor, negation guard
+  src/screen/gates.test.ts       +16 tests
+  config/default.json            operatorCountry, minImpliedHourly
+  docs/screening-gaps-plan.md    (new) plan v1.0 + 10-dimension absorption notes
+  docs/journal.txt               this entry
+
+Tests: 80 -> 96. Added 16, removed 0. npm run typecheck clean.
