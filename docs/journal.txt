@@ -330,3 +330,65 @@ Files
   (outside the repo)     ~/upwork-profile/corpus/product-growth-and-positioning.md, TAGS.md
 
 Tests: 80, unchanged. npm run typecheck clean.
+
+
+2026-09-04 (cont.) — first submissions since the restriction, three by hand
+----------------------------------------------------------------------------
+Three proposals submitted through the MCP server, each one previewed, presented
+and confirmed individually by Mahi. No code ran to produce them beyond the
+drafting library; poll.ts never started.
+
+  SUBMITTED  2095830415708221441  AI Enterprise Architecture Consultant
+             $200 fixed ·  7 connects + 1 boost bid · letter 1853 chars
+             5 screening answers · portfolio: pip0, WhatsScale
+  SUBMITTED  2095830813961609217  Business Strategist for SaaS Growth
+             $30/hr    · 17 connects · no boost
+  SUBMITTED  2095834325717839873  Product & Growth Strategist for SaaS
+             $35/hr    ·  8 connects · no boost
+
+Balance 130 -> 98, verified against connects_balance rather than arithmetic.
+The boost bid is not in the ledger: it is charged only on a top-4 finish or
+client engagement, so 1 connect is still outstanding on the first.
+
+Notes from doing this by hand that the automated path does not know:
+
+  1. The kill switch does not cover the MCP path. STOP is read at
+     submit/run.ts:57, which is the agent's own submit. A direct
+     manage_proposals call bypasses it entirely. Nothing in this repo could
+     have stopped these three.
+
+  2. Boost is a create-time parameter, not a confirm-time one, so adding a
+     boost means re-issuing the preview. Only one preview is held per action
+     type and a second create silently supersedes the first, which is why
+     these had to be done strictly one at a time.
+
+  3. Boost state varies per job and is worth reading. Two of the three had an
+     empty auction where 1 connect ranks first. The Business Strategist posting
+     already had bids of [5 4 3 2]; we skipped it there, on the grounds that
+     17 connects on an open-ended hourly role with a client who hires BDRs is
+     already the weakest spend of the three.
+
+  4. getJob supplies neither skillTags nor proposalCount — both come from the
+     search hit — so any gate assessment from action=get alone cannot evaluate
+     `relevant` on tags or `pool_small` at all. Worth remembering before
+     trusting a get-only screen.
+
+  5. scope_fits_budget has a false positive worth fixing. The AI architecture
+     posting is a 30-minute call for $200 and scored 22.5 deliverables, 11.25
+     per $100, against a 1.5 floor. countDeliverables counts prose bullets, so
+     a long well-written brief describing what the CLIENT is building reads as
+     scope the freelancer must deliver. It also took +2 twice from HEAVY_SCOPE
+     for "not starting from scratch" and "not a request to build the full
+     system" — both phrases where the client is saying the opposite. Under
+     autoApply this would have rejected the best-fit posting of the five.
+
+Screening answers ran through draft/answers.ts for the first time in
+production. All five were grounded; spot-checked read-only server-side and the
+allow-rule override against mcp-agent-tooling:14,19, the three rewrites against
+claude-code-scaffolding:15, and the 10-dimension stress test against :29,33.
+
+Files
+  docs/journal.txt   this entry
+  (outside the repo) data/ runner scripts, gitignored
+
+Tests: 80, unchanged. npm run typecheck clean.
