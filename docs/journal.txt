@@ -260,3 +260,73 @@ Files
   docs/journal.txt       this entry
 
 Tests: 80, unchanged. npm run typecheck clean.
+
+
+2026-09-04 (cont.) — the rubric could not see the product half of the profile
+------------------------------------------------------------------------------
+Re-authorized the Upwork MCP server, on Mahi's explicit decision after the risk
+was put to him. This is the Claude Code MCP client only, for reads. The agent's
+own token store is still the dead one from 09-01, both pm2 processes are still
+stopped, STOP still exists and autoApply is still false. Five read calls this
+session (list_accounts, four find_jobs action=get). Nothing was spent.
+
+Ran four live postings through screen() with fresh and pool_small neutralised,
+since action=get supplies neither: getJob hardcodes skillTags [] and
+proposalCount null, and only the search hit carries them. All four rejected.
+Three of them, all product/growth/strategy roles, failed on `relevant` alone.
+
+The cause is that screen.skills was 60 entries of tools and technologies with no
+product vocabulary at all. Mahi's Upwork profile already carries Product
+Management, AI Product Management, SaaS Development, Minimum Viable Product and
+Systems Modeling as skill tags; the rubric mirrored none of them. His CV carries
+eight years of product leadership -- Porter 200K to 2M monthly actives and a
+subscription model adding $12M ARR, Adevinta search ranking +10% CTR, Printify
+activation +5pp -- and a corporate strategy role before that. The screener could
+not see any of it, so it was rejecting jobs he is arguably overqualified for.
+
+Corpus: added product-growth-and-positioning (flagship). The load-bearing item
+is pip0's failed go-to-market -- launched standalone, did not break through,
+stopped within weeks of the evidence and repositioned as the engine inside
+WhatsScale. Both drafts generated afterwards led with it, which is the right
+call: for positioning work the launch he got wrong is stronger evidence than the
+ones that worked. Also carries WhatsScale's organic acquisition (1,400 signups
+in eight months, ~500/month, no paid spend, no sales team) and Jindal's market
+entry work. _reindex.sh run, 21 chunks. The corpus is outside the repo, so none
+of this is in this commit.
+
+Deliberately NOT added: +18pp week-1 activation. _verification.md excludes it on
+purpose -- only cite it if the sample size and measurement window can be
+defended from memory. Flagged to Mahi rather than overridden.
+
+Config: screen.skills and score.skills 60 -> 80, adding product management,
+product manager, product strategy, strategist, growth, positioning,
+go-to-market, gtm, activation, adoption, product-led, roadmap, retention, churn,
+monetisation, monetization, marketplace, mvp, minimum viable product.
+
+Re-assessed after the change:
+  APPLY   Business Strategist for SaaS Growth   all gates passed
+  REJECT  B2B SaaS Growth Marketer              client_pays, client_leaves_feedback
+  REJECT  Product & Growth Strategist           client_pays, client_leaves_feedback
+  REJECT  Call and WhatsApp Automation Expert   client_pays, client_leaves_feedback, rate_acceptable
+
+The Business Strategist posting has the best client of the four by a wide margin
+($50,039 spend, 61 contracts, 26 reviews, 4.74) and was being rejected on one
+gate, on vocabulary. That is the concrete cost of the blind spot.
+
+Known cost of the widening: `growth` and `strategist` are broad, so `relevant`
+will now admit growth-marketing and sales-adjacent postings -- the category the
+gate was added for after a sales role cleared everything and scored 76.8.
+`relevant` is a floor rather than a ranking, so scoring still sorts them, but
+this is a real loosening and should be watched before any unattended run.
+
+Also observed: the account is now on Freelancer Basic, not Freelancer Plus, so
+bid_stats_available is false. Mahi confirms the subscription lapsed and was not
+renewed. Not related to the restriction. RESUME.md still says Plus and is stale
+on this point.
+
+Files
+  config/default.json    screen.skills and score.skills, 60 -> 80
+  docs/journal.txt       this entry
+  (outside the repo)     ~/upwork-profile/corpus/product-growth-and-positioning.md, TAGS.md
+
+Tests: 80, unchanged. npm run typecheck clean.
