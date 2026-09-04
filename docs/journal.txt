@@ -392,3 +392,69 @@ Files
   (outside the repo) data/ runner scripts, gitignored
 
 Tests: 80, unchanged. npm run typecheck clean.
+
+
+2026-09-04 (cont.) — three more submissions, and four screening gaps found
+----------------------------------------------------------------------------
+Assessed nine live postings against the gates and submitted three more, taking
+the day to six proposals and 68 connects. Balance 130 -> 74, with a +12
+"Behavioral based subsidy" from Upwork at 12:04 unrelated to anything we did.
+
+  SUBMITTED  2095856769312976897  Principal AI-Native GTM Engineer 0->$5M ARR
+             $125/hr · 18 connects · 5 screening answers
+  SUBMITTED  2095856845305053185  AI Training - specific (Cork)
+             $65/hr  ·  8 connects
+  SUBMITTED  2095856914168979457  AI Automation for Business Tasks
+             $45/hr  · 10 connects
+
+The GTM posting passes `relevant` only because of this morning's config change:
+it matches on `gtm`, a term added hours earlier. Before that it was invisible,
+and it is the highest-rate posting seen to date ($100-200/hr, MANUAL).
+
+Operator correction, applied to the corpus rather than to one letter:
+availability-and-positioning said "typically 15-30 hrs/week". Mahi states he
+can work full time and well beyond. The chunk now says 35-40 is comfortable,
+with an explicit instruction not to hedge it down. This changes every future
+draft, not just this one. Before the fix the GTM letter offered 30 hrs/week
+against a stated 35-40 requirement, and screening answer 1 opened by
+disclaiming the $5M bar rather than leading with Porter's $12M.
+
+Four screening gaps found, in order of what they cost:
+
+  1. LOCATION. A Singapore posting passed every gate and was unwinnable: "Be
+     based in Singapore", plus "[IMPORTANT] Existing Singapore client case
+     studies". 18 connects. No gate models location. Note the fix is NOT a
+     prose regex as first assumed — `find_jobs action=get` returns a structured
+     `preferred_locations: {countries, location_required}` block, which
+     upwork.ts does not read at all. But the Singapore posting carried no such
+     block, so prose is still needed as a fallback. Field first, regex second.
+
+  2. FIXED-PRICE EFFORT. A market research posting at $320 fixed for 6 months
+     at 2 hrs/week is about $6/hr. `rate_acceptable` passes because
+     minFixedBudget is absolute and cannot see duration; scope_fits_budget
+     passes because the posting is four lines with no bullets, so
+     countDeliverables returns ~0. Both money gates wave it through. Hourly
+     postings carry engagementType; fixed-price has no effort denominator.
+
+  3. SCOPE FALSE POSITIVE (recorded earlier today, now with a second instance).
+
+  4. FULL-TIME CAPACITY. `engagementType: FULL_TIME` is in the payload and
+     nothing reads it. Not currently a rejection since Mahi is available full
+     time, but the field is there and unused.
+
+Boost auction data, worth recording because it varies far more than expected
+and is only visible in the create preview:
+  AI Enterprise Architecture   []              1 connect ranks 1st
+  Product & Growth Strategist  []              1 connect ranks 1st
+  Business Strategist          [5 4 3 2]       skipped
+  AI Training (Cork)           [30 3 2 1]      skipped
+  AI Automation                [25 17 5 1]     skipped
+  GTM Engineer                 [30 10 6 5]     skipped
+A single 25-30 connect bid appears on three of them, which on an 8-18 connect
+posting is someone spending two to three times the application cost on rank.
+
+Files
+  docs/journal.txt   this entry
+  (outside the repo) corpus availability-and-positioning.md updated
+
+Tests: 80, unchanged. npm run typecheck clean.
