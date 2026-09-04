@@ -204,3 +204,59 @@ Files
   /root/.pm2/dump.pm2    saved with both processes stopped
 
 Tests: 80, unchanged. npm run typecheck clean.
+
+
+2026-09-04 — letter register: rewrote the compose prompt around genre
+---------------------------------------------------------------------
+Closes the drafting feedback left open on 09-01 and still listed as unfixed on
+09-02. No pipeline ran and nothing contacted Upwork; the account remains stood
+down.
+
+The 09-01 note recorded five tics (ALL-CAPS headers, a contrarian stakes-raising
+opener, vivid worst-case imagery, aphoristic closers, arrow bullets used for
+rhythm) and called the register structural rather than incidental. Regenerating
+a letter for a live posting reproduced all five, which confirmed that reading.
+
+The sharper diagnosis is genre, not tone. The old SYSTEM opened "THIS IS A SALES
+PITCH", and the model read that as a brief to produce marketing: sectioned,
+quotable, a metrics block, an explainer addressed to an audience, a paragraph of
+positioning for an adjacent product. That is a capabilities page, not a message
+to one buyer. The tics follow from the genre, which is why treating them as
+wording would not have held.
+
+Rewrote SYSTEM around what is being written:
+  - "A message to one person. Not marketing, not a capabilities page, not a
+    LinkedIn post", with an explicit test — if it would work unchanged as a
+    landing page it is wrong, and a proposal is one that could only have been
+    sent to this client about this post.
+  - ANSWER THEIR POST: use their words, engage what they actually wrote.
+  - MAKE ONE ARGUMENT: one case, evidence in support of it rather than on
+    display, spoken figures rounded rather than a spec-sheet row.
+  - Gaps go in a sentence in the flow, not a section of their own.
+  - Explicit avoid-list for the five tics, plus a hard rule against em and en
+    dashes in any position.
+  - Target length 3000-4000 chars -> 1200-1500, on the reasoning that length is
+    the clearest genre tell.
+
+Kept verbatim: the evidence-grounding rule, the "Do not claim" handling, the
+compliance-marker and injection rules, and the ban on writing that he is the
+wrong hire.
+
+Measured on the same posting, same evidence, same model: 4207 chars -> 1681, no
+headers, no dashes, opens by quoting the client's own brief, closes on two
+questions specific to their setup.
+
+Two things this session did not fix:
+  - verify.ts still checks only length, compliance markers and agent-directed
+    text. It does not check claims against evidence, and it does not check the
+    dash ban. Both are prompt-only, and a prompt instruction is a hope rather
+    than a control -- the same lesson the length retry already encodes.
+  - The drafting path still cannot be exercised without MCP auth. draft-one.ts
+    takes a job id and fetches the posting, so a pasted posting needed a local
+    runner in the gitignored data/ to reuse the pipeline.
+
+Files
+  src/draft/compose.ts   SYSTEM rewritten
+  docs/journal.txt       this entry
+
+Tests: 80, unchanged. npm run typecheck clean.
